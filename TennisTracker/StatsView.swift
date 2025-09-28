@@ -177,22 +177,79 @@ struct StatsTableView: View {
         return match.sortedPoints
     }
 
-    private var finalScore: String {
-        ScoreEngine.compute(
-            visiblePoints: match.sortedPoints,
-            fullPoints: match.sortedPoints,
-            p1: match.playerOne.id,
-            p2: match.playerTwo.id,
-            firstServerID: match.firstServerID
-        ).endScoreString
+    private var finalScoreWithWinner: (winner: String?, score: String) {
+        if let setNumber = selectedSet {
+            // Show individual set score with winner first
+            let setPoints = match.sortedPoints.filter { $0.setNumber == setNumber }
+            let derivedState = ScoreEngine.compute(
+                visiblePoints: setPoints,
+                fullPoints: setPoints,
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID
+            )
+
+            // For individual sets, check if it's completed or in progress
+            if let completedSet = derivedState.setScores.first {
+                // Set is completed - show winner and final score
+                let p1Games = completedSet.p1Games
+                let p2Games = completedSet.p2Games
+
+                if p1Games > p2Games {
+                    return (winner: match.playerOne.name, score: "\(p1Games)-\(p2Games)")
+                } else if p2Games > p1Games {
+                    return (winner: match.playerTwo.name, score: "\(p2Games)-\(p1Games)")
+                }
+            } else {
+                // Set is incomplete - show who's leading with current score
+                let currentScore = derivedState.currentScoreString
+
+                // Determine who's leading in the current incomplete set
+                if let leaderID = derivedState.leaderID {
+                    let leaderName = leaderID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+                    return (winner: nil, score: "\(leaderName) leads \(currentScore) (incomplete set)")
+                } else {
+                    // Tied or no clear leader
+                    return (winner: nil, score: "Tied \(currentScore) (incomplete set)")
+                }
+            }
+
+            return (winner: nil, score: "0-0 (incomplete set)")
+        } else {
+            // Show overall match score
+            let derivedState = ScoreEngine.compute(
+                visiblePoints: match.sortedPoints,
+                fullPoints: match.sortedPoints,
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID
+            )
+
+            let score = derivedState.endScoreString
+
+            // Determine overall winner based on completed sets
+            if let leaderID = derivedState.leaderID {
+                let winnerName = leaderID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+                return (winner: winnerName, score: score)
+            }
+
+            return (winner: nil, score: score)
+        }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Final score
-            Text("Score: \(finalScore)")
-                .font(.title3)
-                .fontWeight(.semibold)
+            // Final score with winner
+            let scoreInfo = finalScoreWithWinner
+            if let winner = scoreInfo.winner {
+                Text("\(winner) wins: \(scoreInfo.score)")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+            } else {
+                Text(scoreInfo.score)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+            }
 
             // Stats for each player
             VStack(spacing: 12) {

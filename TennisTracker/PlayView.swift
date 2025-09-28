@@ -19,7 +19,8 @@ struct PlayView: View {
             visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
             p1: match.playerOne.id,
             p2: match.playerTwo.id,
-            firstServerID: match.firstServerID
+            firstServerID: match.firstServerID,
+            tiebreakFirstServers: match.tiebreakFirstServers
         )
     }
 
@@ -236,6 +237,7 @@ struct PointInputView: View {
     let modelContext: ModelContext
 
     @State private var isProcessingPoint = false
+    @State private var lastPointTime: Date = Date()
 
     var body: some View {
         VStack(spacing: 24) {
@@ -260,6 +262,16 @@ struct PointInputView: View {
     }
 
     private func recordPoint(player: Player, type: PointType) {
+        // Debounce rapid button presses to prevent crashes
+        let now = Date()
+        guard now.timeIntervalSince(lastPointTime) > 0.1 else { return } // 100ms minimum between points
+        lastPointTime = now
+
+        // Prevent multiple point processing
+        guard !isProcessingPoint else { return }
+        isProcessingPoint = true
+        defer { isProcessingPoint = false }
+
         // Determine who actually won the point based on the type
         let winner: Player
         let loser: Player
@@ -300,16 +312,37 @@ struct PointInputView: View {
         )
 
         let newPoint = Point(
-            matchID: match.id,
+            match: match,
             winner: winner,
             loser: loser,
             type: type,
             setNumber: setNumber
         )
 
-        // Simple array append - should work perfectly in a fresh project
-        match.points.append(newPoint)
+        // Store old points for tiebreak detection
+        let oldPoints = match.sortedPoints
+
+        // Add point using proper SwiftData relationship
+        modelContext.insert(newPoint)
         viewModel.cursor = match.sortedPoints.count
+
+        // Check if we just started a new tiebreak and update tiebreak first servers
+        let updatedTiebreakFirstServers = ScoreEngine.checkForTiebreakStart(
+            oldPoints: oldPoints,
+            newPoints: match.sortedPoints,
+            p1: match.playerOne.id,
+            p2: match.playerTwo.id,
+            firstServerID: match.firstServerID,
+            currentTiebreakFirstServers: match.tiebreakFirstServers
+        )
+
+        if updatedTiebreakFirstServers.count > match.tiebreakFirstServers.count {
+            let tiebreakFirstServer = updatedTiebreakFirstServers.last!
+            let serverName = tiebreakFirstServer == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+            print("🎾 TIEBREAK STARTED: \(serverName) serves first in tiebreak")
+        }
+
+        match.tiebreakFirstServers = updatedTiebreakFirstServers
 
         // DEBUG: Log for each button press
         let buttonPressed = "\(player.name)'s \(type.rawValue)"

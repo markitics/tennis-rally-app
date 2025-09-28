@@ -37,8 +37,24 @@ final class Match {
     var isCompleted: Bool = false
     var notes: String?
 
-    // Using simple array instead of @Relationship to avoid SwiftData corruption
+    // Use proper SwiftData relationships
+    @Relationship(deleteRule: .cascade, inverse: \Point.match)
     var points: [Point] = []
+
+    // Track who served first in each tiebreak for correct next-set server (stored as string)
+    private var tiebreakFirstServersData: String = ""
+
+    // Computed property for accessing tiebreak first servers
+    var tiebreakFirstServers: [UUID] {
+        get {
+            guard !tiebreakFirstServersData.isEmpty else { return [] }
+            let uuidStrings = tiebreakFirstServersData.components(separatedBy: ",")
+            return uuidStrings.compactMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespaces)) }
+        }
+        set {
+            tiebreakFirstServersData = newValue.map { $0.uuidString }.joined(separator: ",")
+        }
+    }
 
     // Computed property that returns points sorted chronologically
     var sortedPoints: [Point] {
@@ -67,17 +83,18 @@ final class Match {
 @Model
 final class Point {
     @Attribute(.unique) var id: UUID
-    var matchID: UUID  // Store ID instead of relationship to avoid circular reference
-
     var winner: Player
     var loser: Player
     var type: PointType
     var setNumber: Int
     var timestamp: Date
 
+    // Relationship back to match
+    var match: Match?
+
     init(
         id: UUID = UUID(),
-        matchID: UUID,
+        match: Match,
         winner: Player,
         loser: Player,
         type: PointType,
@@ -85,7 +102,7 @@ final class Point {
         timestamp: Date = Date()
     ) {
         self.id = id
-        self.matchID = matchID
+        self.match = match
         self.winner = winner
         self.loser = loser
         self.type = type

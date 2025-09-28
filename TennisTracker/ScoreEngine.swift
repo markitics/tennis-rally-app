@@ -68,22 +68,91 @@ enum ScoreEngine {
         return state.completedSets.count + 1
     }
 
+    // Helper to detect if we just entered a tiebreak and who should serve first
+    static func checkForTiebreakStart(
+        oldPoints: [Point],
+        newPoints: [Point],
+        p1: UUID,
+        p2: UUID,
+        firstServerID: UUID,
+        currentTiebreakFirstServers: [UUID]
+    ) -> [UUID] {
+        let oldState = foldPoints(points: oldPoints, p1: p1, p2: p2)
+        let newState = foldPoints(points: newPoints, p1: p1, p2: p2)
+
+        // Check if we just entered a new tiebreak
+        if !oldState.inTiebreak && newState.inTiebreak {
+            let currentSetNumber = newState.completedSets.count + 1
+
+            // Only record if we don't already have this tiebreak recorded
+            if currentSetNumber > currentTiebreakFirstServers.count {
+                // Calculate who serves first in tiebreak (whoever would serve the NEXT game)
+                let totalCompletedGames = oldState.completedSets.reduce(0) { $0 + $1.p1 + $1.p2 }
+                let currentSetGames = oldState.currentSetGames.p1 + oldState.currentSetGames.p2
+                let totalGamesPlayed = totalCompletedGames + currentSetGames
+                // Add 1 because we want who would serve game 13 (the next game after 6-6)
+                let tiebreakFirstServer = (totalGamesPlayed + 1) % 2 == 0 ? firstServerID : (firstServerID == p1 ? p2 : p1)
+
+                var updatedServers = currentTiebreakFirstServers
+                updatedServers.append(tiebreakFirstServer)
+                return updatedServers
+            }
+        }
+
+        return currentTiebreakFirstServers
+    }
+
     static func currentServerID(
         visiblePoints: [Point],
         p1: UUID,
         p2: UUID,
-        firstServerID: UUID
+        firstServerID: UUID,
+        tiebreakFirstServers: [UUID] = []
     ) -> UUID {
         let state = foldPoints(points: visiblePoints, p1: p1, p2: p2)
 
         if state.inTiebreak {
             let tiebreakPoints = state.currentGameScore.p1 + state.currentGameScore.p2
-            let serverChanges = tiebreakPoints / 2
-            return serverChanges % 2 == 0 ? firstServerID : (firstServerID == p1 ? p2 : p1)
+
+            // Determine who serves first in this tiebreak
+            let currentSetNumber = state.completedSets.count + 1
+            let tiebreakFirstServer: UUID
+
+            if currentSetNumber <= tiebreakFirstServers.count {
+                // Use stored tiebreak first server
+                tiebreakFirstServer = tiebreakFirstServers[currentSetNumber - 1]
+            } else {
+                // Calculate who should serve first in tiebreak (normal alternation)
+                let totalCompletedGames = state.completedSets.reduce(0) { $0 + $1.p1 + $1.p2 }
+                let currentSetGames = state.currentSetGames.p1 + state.currentSetGames.p2
+                let totalGamesPlayed = totalCompletedGames + currentSetGames
+                tiebreakFirstServer = totalGamesPlayed % 2 == 0 ? firstServerID : (firstServerID == p1 ? p2 : p1)
+            }
+
+            // Tennis rule: first server serves 1 point, then alternate every 2 points
+            let serverChanges = (tiebreakPoints + 1) / 2
+            return serverChanges % 2 == 0 ? tiebreakFirstServer : (tiebreakFirstServer == p1 ? p2 : p1)
         } else {
-            // Server alternates every game - add completed sets games to current set games
+            // Server alternates every game, but account for tiebreak-to-next-set rule
             let totalCompletedGames = state.completedSets.reduce(0) { $0 + $1.p1 + $1.p2 }
             let currentSetGames = state.currentSetGames.p1 + state.currentSetGames.p2
+
+            // If we're starting a new set after a tiebreak, apply the official rule
+            if currentSetGames == 0 && state.completedSets.count > 0 {
+                // Check if the previous set was won by tiebreak (7-6 or 6-7)
+                let lastSet = state.completedSets.last!
+                if (lastSet.p1 == 7 && lastSet.p2 == 6) || (lastSet.p1 == 6 && lastSet.p2 == 7) {
+                    // Previous set had tiebreak - receiver of first tiebreak point serves first
+                    let tiebreakIndex = state.completedSets.count - 1
+                    if tiebreakIndex < tiebreakFirstServers.count {
+                        let tiebreakFirstServer = tiebreakFirstServers[tiebreakIndex]
+                        // Return the opponent of who served first in tiebreak
+                        return tiebreakFirstServer == p1 ? p2 : p1
+                    }
+                }
+            }
+
+            // Normal alternation based on total games played
             let totalGamesPlayed = totalCompletedGames + currentSetGames
             return totalGamesPlayed % 2 == 0 ? firstServerID : (firstServerID == p1 ? p2 : p1)
         }

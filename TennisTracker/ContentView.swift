@@ -139,6 +139,7 @@ struct ContentView: View {
         )
 
         modelContext.insert(newMatch)
+        selectedMatch = newMatch  // Auto-select the new match in View tab
         showingFirstServerSelection = false
     }
 }
@@ -205,13 +206,12 @@ struct FirstServerSelectionView: View {
 
                 Button(action: tossCoin) {
                     HStack {
-                        if isFlipping {
-                            Text("🪙")
-                                .rotationEffect(.degrees(isFlipping ? 720 : 0))
-                                .animation(.easeInOut(duration: 1.0), value: isFlipping)
-                        } else {
-                            Text("🪙")
-                        }
+                        CoinView(
+                            player1: player1,
+                            player2: player2,
+                            isFlipping: isFlipping,
+                            result: coinResult
+                        )
                         Text("Toss for it")
                     }
                 }
@@ -221,11 +221,19 @@ struct FirstServerSelectionView: View {
             }
 
             if let result = coinResult, !isFlipping {
-                Text("\(result.name) serves first!")
-                    .font(.headline)
+                Text("🎾 \(result.name) serves first! 🎾")
+                    .font(.title3)
+                    .fontWeight(.bold)
                     .foregroundStyle(.green)
+                    .scaleEffect(1.1)
+                    .animation(.easeOut(duration: 0.3), value: coinResult)
                     .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        // Add haptic feedback
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+
+                        // Auto-select after longer delay for dramatic effect
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             onPlayerSelected(result)
                         }
                     }
@@ -238,10 +246,58 @@ struct FirstServerSelectionView: View {
         isFlipping = true
         coinResult = nil
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        // Add initial haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+
+        // Longer, more dramatic flip duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             coinResult = Bool.random() ? player1 : player2
             isFlipping = false
         }
+    }
+}
+
+struct CoinView: View {
+    let player1: Player
+    let player2: Player
+    let isFlipping: Bool
+    let result: Player?
+
+    var body: some View {
+        ZStack {
+            // Coin background
+            Circle()
+                .fill(.yellow.gradient)
+                .frame(width: 32, height: 32)
+                .overlay(
+                    Circle()
+                        .stroke(.orange, lineWidth: 2)
+                )
+
+            // Player names on coin faces
+            if isFlipping {
+                // Show spinning coin during flip
+                Text("🪙")
+                    .font(.title2)
+                    .rotationEffect(.degrees(isFlipping ? 1440 : 0)) // 4 full rotations
+                    .animation(.easeOut(duration: 2.0), value: isFlipping)
+            } else if let winner = result {
+                // Show winner's initial after flip
+                Text(String(winner.name.prefix(1)))
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.black)
+                    .scaleEffect(result != nil ? 1.2 : 1.0)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.6), value: result)
+            } else {
+                // Show coin emoji when idle
+                Text("🪙")
+                    .font(.title2)
+            }
+        }
+        .scaleEffect(isFlipping ? 1.1 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isFlipping)
     }
 }
 
