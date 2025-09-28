@@ -12,7 +12,9 @@ import SwiftData
 struct TennisTrackerApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Player.self,
+            Match.self,
+            Point.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

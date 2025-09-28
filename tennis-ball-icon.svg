@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle - tennis ball yellow/green -->
+  <circle cx="512" cy="512" r="512" fill="#CCFF00"/>
+
+  <!-- Subtle shadow/gradient for depth -->
+  <defs>
+    <radialGradient id="ballGradient" cx="0.3" cy="0.3" r="0.8">
+      <stop offset="0%" stop-color="#E6FF33"/>
+      <stop offset="100%" stop-color="#B3E600"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Main ball with gradient -->
+  <circle cx="512" cy="512" r="512" fill="url(#ballGradient)"/>
+
+  <!-- Tennis ball curved seam lines -->
+  <g fill="none" stroke="white" stroke-width="24" stroke-linecap="round">
+    <!-- Left curved line -->
+    <path d="M 200 200 Q 350 512 200 824" opacity="0.9"/>
+    <!-- Right curved line -->
+    <path d="M 824 200 Q 674 512 824 824" opacity="0.9"/>
+  </g>
+
+  <!-- Inner shadow lines for more definition -->
+  <g fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="8" stroke-linecap="round">
+    <!-- Left inner line -->
+    <path d="M 220 220 Q 360 512 220 804"/>
+    <!-- Right inner line -->
+    <path d="M 804 220 Q 664 512 804 804"/>
+  </g>
+
+  <!-- Subtle outer shadow lines -->
+  <g fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="8" stroke-linecap="round">
+    <!-- Left outer line -->
+    <path d="M 180 180 Q 340 512 180 844"/>
+    <!-- Right outer line -->
+    <path d="M 844 180 Q 684 512 844 844"/>
+  </g>
+</svg>

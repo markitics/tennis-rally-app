@@ -1,0 +1,96 @@
+{
+  "source": "/Users/mark/Dropbox/code/ios/TennisTracker/TennisTracker/TennisTracker/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Active Match",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 143
+        }
+      },
+      {
+        "comment": "",
+        "key": "You can start a new match or view completed matches in the View tab.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 147
+        }
+      },
+      {
+        "comment": "",
+        "key": "Welcome to Tennis Tracker",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 151
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start tracking your tennis matches with precise point-by-point scoring.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 155
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start New Match",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 160
+        }
+      },
+      {
+        "comment": "",
+        "key": "Who serves first?",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 179
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ serves first!",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 214
+        }
+      },
+      {
+        "comment": "",
+        "key": "🪙",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 199
+        }
+      },
+      {
+        "comment": "",
+        "key": "🪙",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 203
+        }
+      },
+      {
+        "comment": "",
+        "key": "Toss for it",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 205
+        }
+      }
+    ]
+  },
+  "version": 1
+}
