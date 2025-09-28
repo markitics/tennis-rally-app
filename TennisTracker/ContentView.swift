@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 struct ContentView: View {
     enum Tab: String, CaseIterable, Identifiable {
@@ -32,6 +33,13 @@ struct ContentView: View {
     @State private var selectedMatch: Match?
     @State private var showingFirstServerSelection = false
     @StateObject private var matchViewModel = MatchViewModel()
+    @StateObject private var liveActivityManager: LiveActivityManager = {
+        if #available(iOS 16.1, *) {
+            return LiveActivityManager()
+        } else {
+            return LiveActivityManager()
+        }
+    }()
 
     var body: some View {
         NavigationStack {
@@ -50,7 +58,7 @@ struct ContentView: View {
                     switch selectedTab {
                     case .play:
                         if let match = activeMatch {
-                            PlayView(match: match, viewModel: matchViewModel)
+                            PlayView(match: match, viewModel: matchViewModel, liveActivityManager: liveActivityManager)
                         } else if showingFirstServerSelection {
                             FirstServerSelectionView(
                                 player1: matches.first?.playerOne ?? Player(name: "Mark"),
@@ -114,6 +122,7 @@ struct ContentView: View {
 
 
     private func createNewMatch(firstServer: Player) {
+        print("🎾 DEBUG: createNewMatch called with server: \(firstServer.name)")
         let player1: Player
         let player2: Player
 
@@ -141,6 +150,32 @@ struct ContentView: View {
         modelContext.insert(newMatch)
         selectedMatch = newMatch  // Auto-select the new match in View tab
         showingFirstServerSelection = false
+
+        // Send immediate test notification
+        let content = UNMutableNotificationContent()
+        content.title = "🎾 Match Started!"
+        content.body = "New match: \(firstServer.name) serving first"
+        content.sound = .default
+
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ Failed to send match start notification: \(error)")
+            } else {
+                print("🔔 Match start notification sent successfully")
+            }
+        }
+
+        // Start Live Activity for the new match
+        if #available(iOS 16.1, *) {
+            let serverName = firstServer.name
+            print("🎾 About to start Live Activity for new match")
+            liveActivityManager.startMatchActivity(
+                match: newMatch,
+                serverName: serverName,
+                currentScore: "0-0"
+            )
+        }
     }
 }
 

@@ -7,12 +7,14 @@
 
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 struct PlayView: View {
     @Environment(\.modelContext) private var modelContext
 
     let match: Match
     @ObservedObject var viewModel: MatchViewModel
+    @ObservedObject var liveActivityManager: LiveActivityManager
 
     private var currentServerID: UUID {
         ScoreEngine.currentServerID(
@@ -49,7 +51,8 @@ struct PlayView: View {
                     match: match,
                     viewModel: viewModel,
                     currentServerID: currentServerID,
-                    modelContext: modelContext
+                    modelContext: modelContext,
+                    liveActivityManager: liveActivityManager
                 )
             }
             .padding()
@@ -60,7 +63,7 @@ struct PlayView: View {
                 .padding(.bottom)
         }
     }
-}
+
 
 struct PlayerHeaderView: View {
     let player: Player
@@ -235,6 +238,7 @@ struct PointInputView: View {
     @ObservedObject var viewModel: MatchViewModel
     let currentServerID: UUID
     let modelContext: ModelContext
+    @ObservedObject var liveActivityManager: LiveActivityManager
 
     @State private var isProcessingPoint = false
     @State private var lastPointTime: Date = Date()
@@ -259,6 +263,13 @@ struct PointInputView: View {
                 }
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
+            print("🔔 NOTIFICATION RECEIVED: onReceive triggered!")
+            handleWidgetPointAction(notification)
+        }
+        .onAppear {
+            print("📱 PointInputView appeared - notification listener is active")
+        }
     }
 
     private func recordPoint(player: Player, type: PointType) {
@@ -271,6 +282,9 @@ struct PointInputView: View {
         guard !isProcessingPoint else { return }
         isProcessingPoint = true
         defer { isProcessingPoint = false }
+
+        // Store score before adding this point to detect game completion
+        let oldScore = viewModel.derivedState.currentScoreString
 
         // Determine who actually won the point based on the type
         let winner: Player
@@ -358,6 +372,155 @@ struct PointInputView: View {
 
         // DEBUG: Log ALL points to verify chronological order
         print("ALL POINTS (\(match.sortedPoints.count)): \(match.sortedPoints.map { "\($0.winner.name):\($0.type.rawValue)" }.joined(separator: ", "))")
+
+        // Check for game completion (when in-game score resets to 0-0)
+        print("🎾 SCORE ANALYSIS: Old: '\(oldScore)' -> New: '\(newScore)'")
+
+        let gameCompleted = didGameComplete(oldScore: oldScore, newScore: newScore)
+        print("🎾 GAME COMPLETION CHECK: \(gameCompleted)")
+
+        if gameCompleted {
+            let isWinner = winner.name == match.playerOne.name && match.playerOne.name == "Mark" ||
+                          winner.name == match.playerTwo.name && match.playerTwo.name == "Mark"
+
+            let title = isWinner ? "🎉 Great Job!" : "🎾 Stay Focused!"
+            let body = isWinner ? "You won that game! \(newScore)" : "Keep pushing! \(newScore)"
+
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+
+            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    print("❌ Failed to send game completion notification: \(error)")
+                } else {
+                    print("🔔 Game completion notification sent: \(title)")
+                }
+            }
+        }
+
+        // Update Live Activity with new score
+        if #available(iOS 16.1, *) {
+            let serverName = currentServerID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+            liveActivityManager.updateMatchActivity(
+                currentScore: newScore,
+                serverName: serverName
+            )
+        }
+    }
+
+    private func didGameComplete(oldScore: String, newScore: String) -> Bool {
+        // Game completes when in-game score resets to 0-0 (new game starts)
+        // This happens when someone wins a game and the next game begins
+
+        // Check if old score had an in-game component that wasn't 0-0
+        // and new score shows 0-0 (meaning game just completed)
+
+        let oldInGame = getInGameScore(from: oldScore)
+        let newInGame = getInGameScore(from: newScore)
+
+        print("🎾 GAME COMPLETION DEBUG: oldInGame='\(oldInGame)', newInGame='\(newInGame)'")
+
+        // Game completed if we went from some in-game score to 0-0
+        let completed = oldInGame != "0-0" && newInGame == "0-0"
+        print("🎾 GAME COMPLETION RESULT: \(completed)")
+
+        return completed
+    }
+
+    private func getInGameScore(from score: String) -> String {
+        // Extract in-game score like "15-30" from "6-3, 2-1, 15-30"
+        // Or "0-0" if no in-game score exists
+
+        let parts = score.components(separatedBy: ", ")
+
+        if parts.count <= 2 {
+            // Either "1-2" (no in-game) or "6-3, 2-1" (no in-game)
+            return "0-0"
+        } else {
+            // "6-3, 2-1, 15-30" -> return "15-30"
+            return parts.last ?? "0-0"
+        }
+    }
+
+    private func getGamesComponent(from parts: [String]) -> String {
+        // Score format examples:
+        // "1-2" -> games component is "1-2"
+        // "6-3, 2-1" -> games component is "2-1"
+        // "6-6 (3-2)" -> games component is "6-6"
+
+        if parts.count == 1 {
+            // Single component like "1-2" - this is the games
+            return parts[0]
+        } else if parts.count == 2 {
+            // Two components like "6-3, 2-1" - second is current set games
+            return parts[1]
+        } else {
+            // Multiple sets like "6-3, 6-4, 2-1" - last is current set games
+            return parts.last ?? ""
+        }
+    }
+
+    // Handle point recording from Live Activity buttons
+    private func handleWidgetPointAction(_ notification: Notification) {
+        let timestamp = Date()
+        print("🎯 WIDGET ACTION HANDLER [\(timestamp)]: Function called!")
+        print("🎯 WIDGET ACTION HANDLER: Notification name: '\(notification.name)'")
+        print("🎯 WIDGET ACTION HANDLER: Notification object: \(notification.object ?? "nil")")
+        print("🎯 WIDGET ACTION HANDLER: UserInfo: \(notification.userInfo ?? [:])")
+
+        guard let userInfo = notification.userInfo,
+              let pointTypeString = userInfo["pointType"] as? String,
+              let playerName = userInfo["player"] as? String else {
+            print("❌ Invalid widget action notification")
+            print("❌ userInfo exists: \(notification.userInfo != nil)")
+            print("❌ pointType: '\(notification.userInfo?["pointType"] ?? "nil")'")
+            print("❌ player: '\(notification.userInfo?["player"] ?? "nil")'")
+            return
+        }
+
+        print("🎯 WIDGET ACTION: \(pointTypeString) for \(playerName)")
+
+        // Convert string to PointType
+        let pointType: PointType
+        switch pointTypeString {
+        case "winner":
+            pointType = .otherWinner
+            print("🎯 Converted to: .otherWinner")
+        case "unforcedError":
+            pointType = .unforcedError
+            print("🎯 Converted to: .unforcedError")
+        default:
+            print("❌ Unknown point type: \(pointTypeString)")
+            return
+        }
+
+        // Find the player
+        let player: Player
+        print("🎯 Looking for player '\(playerName)'")
+        print("🎯 Available players: '\(match.playerOne.name)' vs '\(match.playerTwo.name)'")
+
+        if playerName == match.playerOne.name {
+            player = match.playerOne
+            print("🎯 Found player: \(match.playerOne.name) (Player One)")
+        } else if playerName == match.playerTwo.name {
+            player = match.playerTwo
+            print("🎯 Found player: \(match.playerTwo.name) (Player Two)")
+        } else {
+            print("❌ Unknown player: '\(playerName)'")
+            print("❌ Expected: '\(match.playerOne.name)' or '\(match.playerTwo.name)'")
+            return
+        }
+
+        print("🎯 RECORDING POINT: \(pointType.rawValue) for \(player.name)")
+        print("🎯 About to call recordPoint...")
+
+        // Record the point using existing logic
+        recordPoint(player: player, type: pointType)
+
+        print("🎯 ✅ recordPoint completed [\(timestamp)]")
     }
 }
 
@@ -452,14 +615,4 @@ struct PointButton: View {
     }
 }
 
-#Preview {
-    let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: Player.self, Match.self, Point.self, configurations: config)
-
-    let player1 = Player(name: "You")
-    let player2 = Player(name: "Opponent")
-    let match = Match(playerOne: player1, playerTwo: player2, firstServerID: player1.id)
-
-    return PlayView(match: match, viewModel: MatchViewModel())
-    .modelContainer(container)
 }

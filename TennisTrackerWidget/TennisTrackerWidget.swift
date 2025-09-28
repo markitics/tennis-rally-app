@@ -2,87 +2,92 @@
 //  TennisTrackerWidget.swift
 //  TennisTrackerWidget
 //
-//  Created by M@rkMoriarty.com on 9/28/25.
+//  Enhanced Live Activity with score and buttons
 //
 
 import WidgetKit
 import SwiftUI
+import ActivityKit
+import AppIntents
 
-struct Provider: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), configuration: ConfigurationAppIntent())
-    }
-
-    func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry {
-        SimpleEntry(date: Date(), configuration: configuration)
-    }
-    
-    func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
-        var entries: [SimpleEntry] = []
-
-        // Generate a timeline consisting of five entries an hour apart, starting from the current date.
-        let currentDate = Date()
-        for hourOffset in 0 ..< 5 {
-            let entryDate = Calendar.current.date(byAdding: .hour, value: hourOffset, to: currentDate)!
-            let entry = SimpleEntry(date: entryDate, configuration: configuration)
-            entries.append(entry)
-        }
-
-        return Timeline(entries: entries, policy: .atEnd)
-    }
-
-//    func relevances() async -> WidgetRelevances<ConfigurationAppIntent> {
-//        // Generate a list containing the contexts this widget is relevant in.
-//    }
-}
-
-struct SimpleEntry: TimelineEntry {
-    let date: Date
-    let configuration: ConfigurationAppIntent
-}
-
-struct TennisTrackerWidgetEntryView : View {
-    var entry: Provider.Entry
-
-    var body: some View {
-        VStack {
-            Text("Time:")
-            Text(entry.date, style: .time)
-
-            Text("Favorite Emoji:")
-            Text(entry.configuration.favoriteEmoji)
-        }
-    }
-}
-
-struct TennisTrackerWidget: Widget {
-    let kind: String = "TennisTrackerWidget"
-
+@available(iOS 16.1, *)
+struct TennisMatchLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) { entry in
-            TennisTrackerWidgetEntryView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+        ActivityConfiguration(for: TennisMatchAttributes.self) { context in
+            // Lock screen/banner area - rich content
+            VStack(spacing: 12) {
+                // Header with players
+                HStack {
+                    Text(context.state.playerOneName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+
+                    Text("vs")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Text(context.state.playerTwoName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                }
+
+                // Current score display
+                Text(context.state.currentScore)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .monospacedDigit()
+
+                // Server indicator
+                Text("\(context.state.serverName) serving")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                // Action buttons row
+                HStack(spacing: 16) {
+                    Button(intent: WinnerIntent()) {
+                        VStack(spacing: 4) {
+                            Text("🏆")
+                                .font(.title3)
+                            Text("Winner")
+                                .font(.caption2)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    Button(intent: UnforcedErrorIntent()) {
+                        VStack(spacing: 4) {
+                            Text("🙈")
+                                .font(.title3)
+                            Text("Error")
+                                .font(.caption2)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(.red)
+                }
+            }
+            .padding()
+        } dynamicIsland: { context in
+            // Minimal Dynamic Island for devices that have it
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.center) {
+                    VStack {
+                        Text("\(context.state.playerOneName) vs \(context.state.playerTwoName)")
+                            .font(.caption)
+                        Text(context.state.currentScore)
+                            .font(.headline)
+                            .monospacedDigit()
+                    }
+                }
+            } compactLeading: {
+                Text("🎾")
+            } compactTrailing: {
+                Text("LIVE")
+            } minimal: {
+                Text("🎾")
+            }
         }
     }
-}
-
-extension ConfigurationAppIntent {
-    fileprivate static var smiley: ConfigurationAppIntent {
-        let intent = ConfigurationAppIntent()
-        intent.favoriteEmoji = "😀"
-        return intent
-    }
-    
-    fileprivate static var starEyes: ConfigurationAppIntent {
-        let intent = ConfigurationAppIntent()
-        intent.favoriteEmoji = "🤩"
-        return intent
-    }
-}
-
-#Preview(as: .systemSmall) {
-    TennisTrackerWidget()
-} timeline: {
-    SimpleEntry(date: .now, configuration: .smiley)
-    SimpleEntry(date: .now, configuration: .starEyes)
 }
