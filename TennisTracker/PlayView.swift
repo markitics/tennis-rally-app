@@ -8,6 +8,9 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import ActivityKit
+import UIKit
+import AVFoundation
 
 struct PlayView: View {
     @Environment(\.modelContext) private var modelContext
@@ -248,17 +251,7 @@ struct TimelineNavigationView: View {
 
                 // Show up to last 50 button presses for debugging
                 if let match = viewModel.match {
-                    ScrollView {
-                        VStack(spacing: 1) {
-                            ForEach(match.sortedPoints.suffix(50).reversed(), id: \.id) { point in
-                                Text("Pt\(match.sortedPoints.firstIndex(where: { $0.id == point.id })! + 1): \(point.winner.name) via \(point.type.rawValue)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.orange)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 150)
+                    GameProgressionView(match: match)
                 }
             }
 
@@ -324,6 +317,43 @@ struct PointInputView: View {
     }
 
     private func recordPoint(player: Player, type: PointType) {
+        // Determine who wins the point to decide haptic pattern and sound
+        let markWins: Bool
+        switch type {
+        case .doubleFault, .unforcedError:
+            // Errors mean the opponent wins the point
+            markWins = (player.id != match.playerOne.id)
+        case .ace, .winner:
+            // Winners and aces mean the player wins
+            markWins = (player.id == match.playerOne.id)
+        }
+
+        // Haptic feedback and sound effects
+        if markWins {
+            // Mark won - short vibration and cheery ding
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.prepare()
+            impactFeedback.impactOccurred()
+
+            // Play cheery success sound
+            AudioServicesPlaySystemSound(1057) // Tink sound
+        } else {
+            // Jeff won - long vibration and sad sound
+            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+            impactFeedback.prepare()
+            impactFeedback.impactOccurred(intensity: 1.0)
+
+            // Create a longer vibration effect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                let continueFeedback = UIImpactFeedbackGenerator(style: .medium)
+                continueFeedback.prepare()
+                continueFeedback.impactOccurred(intensity: 0.8)
+            }
+
+            // Play sad/error sound
+            AudioServicesPlaySystemSound(1006) // Low power sound
+        }
+
         // Debounce rapid button presses to prevent crashes
         let now = Date()
         guard now.timeIntervalSince(lastPointTime) > 0.1 else { return } // 100ms minimum between points
@@ -776,4 +806,192 @@ struct PointButton: View {
     }
 }
 
+struct GameProgressionView: View {
+    let match: Match
+
+    private func pointsToTennisScore(_ p1Points: Int, _ p2Points: Int) -> (String, String) {
+        // Handle deuce scenarios
+        if p1Points >= 3 && p2Points >= 3 {
+            if p1Points == p2Points {
+                return ("40", "40") // Deuce
+            } else if p1Points > p2Points {
+                return ("Ad", "40")
+            } else {
+                return ("40", "Ad")
+            }
+        }
+
+        // Normal scoring
+        func scoreValue(_ points: Int) -> String {
+            switch points {
+            case 0: return "0"
+            case 1: return "15"
+            case 2: return "30"
+            default: return "40"
+            }
+        }
+
+        return (scoreValue(p1Points), scoreValue(p2Points))
+    }
+
+    private func describePoint(_ point: Point) -> String {
+        switch point.type {
+        case .ace:
+            return "\(point.winner.name) ace"
+        case .winner:
+            return "\(point.winner.name) winner"
+        case .doubleFault:
+            return "\(point.loser.name) double fault"
+        case .unforcedError:
+            return "\(point.loser.name) error"
+        }
+    }
+
+    // Find the points for the current game
+    private var currentGamePoints: [Point] {
+        guard !match.sortedPoints.isEmpty else { return [] }
+
+        // Split points into games by walking forward and detecting game boundaries
+        var allGames: [[Point]] = []
+        var currentGame: [Point] = []
+        var p1GameScore = 0
+        var p2GameScore = 0
+
+        for point in match.sortedPoints {
+            currentGame.append(point)
+
+            // Count points in current game
+            if point.winner.id == match.playerOne.id {
+                p1GameScore += 1
+            } else {
+                p2GameScore += 1
+            }
+
+            // Check if game is won
+            let gameWon = (p1GameScore >= 4 || p2GameScore >= 4) && abs(p1GameScore - p2GameScore) >= 2
+            if gameWon {
+                // Game complete, save it and start new game
+                allGames.append(currentGame)
+                currentGame = []
+                p1GameScore = 0
+                p2GameScore = 0
+            }
+        }
+
+        // Return the current incomplete game (if any points exist)
+        return currentGame
+    }
+
+    // Find the points for the last completed game
+    private var lastCompletedGamePoints: [Point] {
+        guard !match.sortedPoints.isEmpty else { return [] }
+
+        // Split points into games by walking forward and detecting game boundaries
+        var allGames: [[Point]] = []
+        var currentGame: [Point] = []
+        var p1GameScore = 0
+        var p2GameScore = 0
+
+        for point in match.sortedPoints {
+            currentGame.append(point)
+
+            // Count points in current game
+            if point.winner.id == match.playerOne.id {
+                p1GameScore += 1
+            } else {
+                p2GameScore += 1
+            }
+
+            // Check if game is won
+            let gameWon = (p1GameScore >= 4 || p2GameScore >= 4) && abs(p1GameScore - p2GameScore) >= 2
+            if gameWon {
+                // Game complete, save it and start new game
+                allGames.append(currentGame)
+                currentGame = []
+                p1GameScore = 0
+                p2GameScore = 0
+            }
+        }
+
+        // Return the last completed game (if any)
+        return allGames.last ?? []
+    }
+
+    private func buildProgression(from points: [Point]) -> String {
+        guard !points.isEmpty else { return "" }
+
+        var progression = "0-0"
+        var p1Score = 0
+        var p2Score = 0
+
+        for point in points {
+            // Update point counts
+            if point.winner.id == match.playerOne.id {
+                p1Score += 1
+            } else {
+                p2Score += 1
+            }
+
+            // Build progression string
+            let action = describePoint(point)
+            let (p1Display, p2Display) = pointsToTennisScore(p1Score, p2Score)
+            let newScore = "\(p1Display)-\(p2Display)"
+            progression += " → \(action) → \(newScore)"
+
+            // Check if game is won
+            let gameWon = (p1Score >= 4 || p2Score >= 4) && abs(p1Score - p2Score) >= 2
+            if gameWon {
+                progression += " (Game)"
+            }
+        }
+
+        return progression
+    }
+
+    private var isCurrentScoreZeroZero: Bool {
+        let currentPoints = currentGamePoints
+        return currentPoints.isEmpty
+    }
+
+    private var isFirstGameOfMatch: Bool {
+        // If we have no completed games and current game is at 0-0
+        return lastCompletedGamePoints.isEmpty && currentGamePoints.isEmpty
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                if match.sortedPoints.isEmpty {
+                    Text("Match just started")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else if isCurrentScoreZeroZero && !isFirstGameOfMatch {
+                    // Show last completed game
+                    Text("Last game finished:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(buildProgression(from: lastCompletedGamePoints))
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(3)
+                } else if !currentGamePoints.isEmpty {
+                    // Show current game in progress
+                    Text("Recent progression:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(buildProgression(from: currentGamePoints))
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(3)
+                } else {
+                    // First game at 0-0
+                    Text("Ready to start first game")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxHeight: 150)
+    }
+}
 }

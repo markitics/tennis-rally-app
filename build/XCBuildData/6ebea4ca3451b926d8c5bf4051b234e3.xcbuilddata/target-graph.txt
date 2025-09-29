@@ -1,2 +1,0 @@
-Target dependency graph (1 target)
-Target 'TennisTracker' in project 'TennisTracker' (no dependencies)

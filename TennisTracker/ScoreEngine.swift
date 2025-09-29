@@ -268,6 +268,7 @@ private extension ScoreEngine {
         // Regular tennis game scoring
         let scoreMap = ["0", "15", "30", "40"]
 
+        // Handle deuce and advantage situations (both players at 3+ points)
         if p1Score >= 3 && p2Score >= 3 {
             if p1Score == p2Score {
                 return ("Deuce", "")
@@ -278,8 +279,9 @@ private extension ScoreEngine {
             }
         }
 
-        let p1Display = p1Score >= 4 ? "40" : scoreMap[p1Score]
-        let p2Display = p2Score >= 4 ? "40" : scoreMap[p2Score]
+        // Normal scoring - cap at 40 (index 3)
+        let p1Display = p1Score >= 3 ? "40" : scoreMap[p1Score]
+        let p2Display = p2Score >= 3 ? "40" : scoreMap[p2Score]
 
         return (p1Display, p2Display)
     }

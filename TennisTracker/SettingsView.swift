@@ -14,7 +14,7 @@ struct SettingsView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("Future features:")
+            Text("Thanks for trying this nascent experimental app! Future features might include some of:")
                 .font(.subheadline)
                 .fontWeight(.medium)
 
@@ -24,6 +24,10 @@ struct SettingsView: View {
                 Text("• Scoring options")
                 Text("• Export/import JSON/CSV")
                 Text("• iCloud toggle")
+                Text("• Screenshot for social media")
+                Text("• User logins")
+                Text("• Subscribe to someone's match")
+                Text("• permalink for finished games")
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
