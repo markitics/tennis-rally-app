@@ -11,5 +11,12 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>INIntentsSupported</key>
+	<array>
+		<string>WinnerIntent</string>
+		<string>UnforcedErrorIntent</string>
+	</array>
+	<key>INIntentsRestrictedWhileLocked</key>
+	<array/>
 </dict>
 </plist>

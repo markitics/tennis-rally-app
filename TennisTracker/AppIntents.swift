@@ -1,8 +1,8 @@
 //
-//  LiveActivityIntents.swift
-//  TennisTrackerWidget
+//  AppIntents.swift
+//  TennisTracker
 //
-//  Background App Intents for Live Activity buttons - no app opening required
+//  Shared App Intent definitions for both main app and widget extension
 //
 
 import AppIntents

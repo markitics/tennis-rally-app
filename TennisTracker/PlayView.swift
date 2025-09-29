@@ -29,22 +29,17 @@ struct PlayView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Player names with server indicator
-                HStack(spacing: 30) {
-                    PlayerHeaderView(
-                        player: match.playerOne,
-                        isServing: currentServerID == match.playerOne.id
-                    )
+                // Combined server indicator and current game score
+                CombinedScoreHeaderView(
+                    match: match,
+                    derivedState: viewModel.derivedState,
+                    currentServerID: currentServerID
+                )
 
-                    PlayerHeaderView(
-                        player: match.playerTwo,
-                        isServing: currentServerID == match.playerTwo.id
-                    )
+                // Completed sets and games display
+                if !viewModel.derivedState.currentScoreString.isEmpty {
+                    CompletedSetsView(derivedState: viewModel.derivedState)
                 }
-                .padding(.top)
-
-                // Score display
-                ScoreDisplayView(match: match, derivedState: viewModel.derivedState)
 
                 // Point input buttons
                 PointInputView(
@@ -65,24 +60,91 @@ struct PlayView: View {
     }
 
 
-struct PlayerHeaderView: View {
-    let player: Player
-    let isServing: Bool
+struct CombinedScoreHeaderView: View {
+    let match: Match
+    let derivedState: DerivedMatchState
+    let currentServerID: UUID
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(isServing ? Color.green : Color.clear)
-                .frame(width: 12, height: 12)
-                .overlay(
-                    Circle()
-                        .stroke(Color.secondary, lineWidth: 1)
-                        .opacity(isServing ? 0 : 1)
-                )
+        HStack {
+            // Mark (left aligned)
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(currentServerID == match.playerOne.id ? Color.green : Color.clear)
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.secondary, lineWidth: 1)
+                            .opacity(currentServerID == match.playerOne.id ? 0 : 1)
+                    )
 
-            Text(player.name)
-                .font(.headline)
-                .fontWeight(isServing ? .semibold : .medium)
+                Text(match.playerOne.name)
+                    .font(.headline)
+                    .fontWeight(currentServerID == match.playerOne.id ? .semibold : .medium)
+            }
+
+            Spacer()
+
+            // Current game score (centered)
+            Text("\(derivedState.inGameDisplay.0)-\(derivedState.inGameDisplay.1)")
+                .font(.title2)
+                .fontWeight(.bold)
+                .monospacedDigit()
+
+            Spacer()
+
+            // Jeff (right aligned)
+            HStack(spacing: 8) {
+                Text(match.playerTwo.name)
+                    .font(.headline)
+                    .fontWeight(currentServerID == match.playerTwo.id ? .semibold : .medium)
+
+                Circle()
+                    .fill(currentServerID == match.playerTwo.id ? Color.green : Color.clear)
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.secondary, lineWidth: 1)
+                            .opacity(currentServerID == match.playerTwo.id ? 0 : 1)
+                    )
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
+struct CompletedSetsView: View {
+    let derivedState: DerivedMatchState
+
+    private var completedSetsAndGames: String {
+        let fullScoreString = derivedState.currentScoreString
+        let parts = fullScoreString.components(separatedBy: ", ")
+
+        // If current game score is 0-0, the ScoreEngine might not include it in the string
+        let currentGameIs00 = derivedState.inGameDisplay.0 == "0" && derivedState.inGameDisplay.1 == "0"
+
+        let baseString: String
+        if currentGameIs00 {
+            // When game is 0-0, the full string IS the completed games/sets
+            baseString = fullScoreString.isEmpty ? "" : fullScoreString
+        } else {
+            // When game is not 0-0, drop the last component (which is the in-game score)
+            if parts.count <= 1 {
+                baseString = ""
+            } else {
+                baseString = parts.dropLast().joined(separator: ", ")
+            }
+        }
+
+        return baseString
+    }
+
+    var body: some View {
+        if !completedSetsAndGames.isEmpty {
+            Text(completedSetsAndGames)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
     }
 }
@@ -244,25 +306,14 @@ struct PointInputView: View {
     @State private var lastPointTime: Date = Date()
 
     var body: some View {
-        VStack(spacing: 24) {
-            PlayerButtonsView(
-                player: match.playerOne,
-                isServer: currentServerID == match.playerOne.id,
-                onPointRecorded: { type in
-                    recordPoint(player: match.playerOne, type: type)
-                }
-            )
-
-            Divider()
-
-            PlayerButtonsView(
-                player: match.playerTwo,
-                isServer: currentServerID == match.playerTwo.id,
-                onPointRecorded: { type in
-                    recordPoint(player: match.playerTwo, type: type)
-                }
-            )
-        }
+        // Unified context-aware 6-button layout (v4)
+        UnifiedButtonsView(
+            match: match,
+            currentServerID: currentServerID,
+            onPointRecorded: { player, type in
+                recordPoint(player: player, type: type)
+            }
+        )
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
             print("🔔 NOTIFICATION RECEIVED: onReceive triggered!")
             handleWidgetPointAction(notification)
@@ -295,8 +346,8 @@ struct PointInputView: View {
             // Errors mean the opponent wins the point
             winner = (player.id == match.playerOne.id) ? match.playerTwo : match.playerOne
             loser = player
-        case .dropShotWinner, .otherWinner, .unknown:
-            // Winners and unknown points mean the player wins
+        case .ace, .winner:
+            // Winners and aces mean the player wins
             winner = player
             loser = (player.id == match.playerOne.id) ? match.playerTwo : match.playerOne
         }
@@ -487,8 +538,11 @@ struct PointInputView: View {
         let pointType: PointType
         switch pointTypeString {
         case "winner":
-            pointType = .otherWinner
-            print("🎯 Converted to: .otherWinner")
+            pointType = .winner
+            print("🎯 Converted to: .winner")
+        case "ace":
+            pointType = .ace
+            print("🎯 Converted to: .ace")
         case "unforcedError":
             pointType = .unforcedError
             print("🎯 Converted to: .unforcedError")
@@ -524,6 +578,113 @@ struct PointInputView: View {
     }
 }
 
+struct UnifiedButtonsView: View {
+    let match: Match
+    let currentServerID: UUID
+    let onPointRecorded: (Player, PointType) -> Void
+
+    private var server: Player {
+        currentServerID == match.playerOne.id ? match.playerOne : match.playerTwo
+    }
+
+    private var receiver: Player {
+        currentServerID == match.playerOne.id ? match.playerTwo : match.playerOne
+    }
+
+    var body: some View {
+        VStack(spacing: 24) {
+
+            VStack(spacing: 16) {
+                // Column headers
+                HStack {
+                    Text("Mark wins point 👇")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+
+                    Text("Jeff wins point 👇")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.yellow)
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal)
+
+                // Row 1: Serve
+                HStack(alignment: .center, spacing: 16) {
+                    Text("Serve:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .frame(width: 60, alignment: .leading)
+
+                    HStack(spacing: 16) {
+                        if server.name == "Mark" {
+                            PointButton("🎾 Mark ace", color: .blue) {
+                                onPointRecorded(match.playerOne, .ace)
+                            }
+                        } else {
+                            // Jeff is serving, so Jeff double fault = Mark wins point (left column)
+                            PointButton("❌ Jeff double fault", color: .blue) {
+                                onPointRecorded(match.playerTwo, .doubleFault)
+                            }
+                        }
+
+                        if server.name == "Jeff" {
+                            PointButton("🎾 Jeff ace", color: .yellow) {
+                                onPointRecorded(match.playerTwo, .ace)
+                            }
+                        } else {
+                            // Mark is serving, so Mark double fault = Jeff wins point (right column)
+                            PointButton("❌ Mark double fault", color: .yellow) {
+                                onPointRecorded(match.playerOne, .doubleFault)
+                            }
+                        }
+                    }
+                }
+
+                // Row 2: Rally
+                HStack(alignment: .center, spacing: 16) {
+                    Text("Rally:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .frame(width: 60, alignment: .leading)
+
+                    HStack(spacing: 16) {
+                        PointButton("🏆 Mark rally winner", color: .blue) {
+                            onPointRecorded(match.playerOne, .winner)
+                        }
+
+                        PointButton("🏆 Jeff rally winner", color: .yellow) {
+                            onPointRecorded(match.playerTwo, .winner)
+                        }
+                    }
+                }
+
+                // Row 3: Rally errors
+                HStack(alignment: .center, spacing: 16) {
+                    Text("")
+                        .frame(width: 60)
+
+                    HStack(spacing: 16) {
+                        // Left column = Mark wins point = Jeff makes unforced error
+                        PointButton("🙈 Jeff unforced error", color: .blue) {
+                            onPointRecorded(match.playerTwo, .unforcedError)
+                        }
+
+                        // Right column = Jeff wins point = Mark makes unforced error
+                        PointButton("🙈 Mark unforced error", color: .yellow) {
+                            onPointRecorded(match.playerOne, .unforcedError)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+}
+
+// Keep the old PlayerButtonsView as a fallback (can remove later)
 struct PlayerButtonsView: View {
     let player: Player
     let isServer: Bool
@@ -538,46 +699,46 @@ struct PlayerButtonsView: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 24) {
-                PointButton("🏆 Drop Shot Winner", color: .teal) {
-                    onPointRecorded(.dropShotWinner)
-                }
-
-                PointButton("🚀 Other Winner", color: .mint) {
-                    onPointRecorded(.otherWinner)
-                }
-
                 if isServer {
+                    PointButton("🎾 Ace", color: .yellow) {
+                        onPointRecorded(.ace)
+                    }
+
                     PointButton("❌ Double Fault", color: .red) {
                         onPointRecorded(.doubleFault)
                     }
                 } else {
-                    // Empty space to maintain grid alignment
-                    Color.clear
-                }
+                    PointButton("🏆 Winner", color: .teal) {
+                        onPointRecorded(.winner)
+                    }
 
-                PointButton("🙈 Unforced Error", color: .pink) {
-                    onPointRecorded(.unforcedError)
+                    PointButton("🙈 Unforced Error", color: .pink) {
+                        onPointRecorded(.unforcedError)
+                    }
                 }
-            }
-
-            PointButton("🤔 Unknown Won", color: .gray) {
-                onPointRecorded(.unknown)
             }
         }
     }
 }
 
+enum PointButtonStyle {
+    case prominent
+    case secondary
+}
+
 struct PointButton: View {
     let title: String
     let color: Color
+    let style: PointButtonStyle
     let disabled: Bool
     let action: () -> Void
 
     @State private var isPressed = false
 
-    init(_ title: String, color: Color = .blue, disabled: Bool = false, action: @escaping () -> Void) {
+    init(_ title: String, color: Color = .blue, style: PointButtonStyle = .prominent, disabled: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.color = color
+        self.style = style
         self.disabled = disabled
         self.action = action
     }
@@ -585,16 +746,16 @@ struct PointButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline)
+                .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 8)
         }
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(disabled ? Color.gray.opacity(0.4) : (isPressed ? color.opacity(0.7) : color))
-                .shadow(color: isPressed ? .clear : color.opacity(0.3), radius: isPressed ? 0 : 4, x: 0, y: isPressed ? 0 : 2)
+                .fill(disabled ? Color.gray.opacity(0.4) : (isPressed ? color.opacity(0.8) : color))
         )
         .scaleEffect(isPressed ? 0.96 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)

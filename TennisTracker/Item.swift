@@ -20,11 +20,11 @@ final class Player {
 }
 
 enum PointType: String, Codable, CaseIterable {
-    case dropShotWinner
-    case otherWinner
-    case doubleFault
-    case unforcedError
-    case unknown
+    case ace           // Service winner (replaces specific ace tracking)
+    case winner        // Any other (non-ace) winner (merges dropShotWinner + otherWinner)
+    case doubleFault   // Service error (unchanged)
+    case unforcedError // Rally error (unchanged)
+    // Removed: unknown (assume everything is tracked)
 }
 
 @Model

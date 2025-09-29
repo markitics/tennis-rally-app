@@ -37,8 +37,14 @@ struct StatsView: View {
                             selectedSet: $selectedSet
                         )
 
-                        // Points chart
+                        // Points Won chart
                         PointsChartView(
+                            match: match,
+                            filteredPoints: selectedSet == nil ? match.sortedPoints : match.sortedPoints.filter { $0.setNumber == selectedSet }
+                        )
+
+                        // Points Played chart
+                        PointsPlayedChartView(
                             match: match,
                             filteredPoints: selectedSet == nil ? match.sortedPoints : match.sortedPoints.filter { $0.setNumber == selectedSet }
                         )
@@ -278,11 +284,11 @@ struct PlayerStatsView: View {
     }
 
     private var totalWinners: Int {
-        playerPoints.filter { $0.type == .dropShotWinner || $0.type == .otherWinner }.count
+        playerPoints.filter { $0.type == .winner }.count
     }
 
-    private var dropShotWinners: Int {
-        playerPoints.filter { $0.type == .dropShotWinner }.count
+    private var aces: Int {
+        playerPoints.filter { $0.type == .ace }.count
     }
 
     private var totalUnforcedErrors: Int {
@@ -293,9 +299,7 @@ struct PlayerStatsView: View {
         playerPoints.filter { $0.type == .doubleFault }.count
     }
 
-    private var unknownPoints: Int {
-        playerPoints.filter { $0.type == .unknown }.count
-    }
+    // Removed unknown points - now tracking everything explicitly
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -303,9 +307,8 @@ struct PlayerStatsView: View {
                 .font(.headline)
 
             Group {
-                Text("Total Winners: \(totalWinners) (Drop-shot: \(dropShotWinners))")
+                Text("Total Winners: \(totalWinners) (Aces: \(aces))")
                 Text("Total Unforced Errors: \(totalUnforcedErrors) (Double faults: \(doubleFaults))")
-                Text("Unknown Won Points: \(unknownPoints)")
                 Text("Total Points Won: \(playerPoints.count)")
             }
             .font(.subheadline)
@@ -388,16 +391,15 @@ struct PointsChartView: View {
     let match: Match
     let filteredPoints: [Point]
 
-    private func getPointCounts(for player: Player) -> (dropShotWinners: Int, otherWinners: Int, doubleFaults: Int, unforcedErrors: Int, unknown: Int) {
+    private func getPointCounts(for player: Player) -> (aces: Int, winners: Int, doubleFaults: Int, unforcedErrors: Int) {
         let wonPoints = filteredPoints.filter { $0.winner.id == player.id }
 
-        let dropShotWinners = wonPoints.filter { $0.type == .dropShotWinner }.count
-        let otherWinners = wonPoints.filter { $0.type == .otherWinner }.count
-        let unknown = wonPoints.filter { $0.type == .unknown }.count
+        let aces = wonPoints.filter { $0.type == .ace }.count
+        let winners = wonPoints.filter { $0.type == .winner }.count
         let doubleFaults = wonPoints.filter { $0.type == .doubleFault }.count
         let unforcedErrors = wonPoints.filter { $0.type == .unforcedError }.count
 
-        return (dropShotWinners, otherWinners, doubleFaults, unforcedErrors, unknown)
+        return (aces, winners, doubleFaults, unforcedErrors)
     }
 
     private var maxPoints: Int {
@@ -408,29 +410,52 @@ struct PointsChartView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Points Won")
+            Text("Points won by this player")
                 .font(.headline)
 
             VStack(spacing: 16) {
-                // Player 1 bar
-                HorizontalPlayerBarView(
-                    player: match.playerOne,
-                    points: getPointCounts(for: match.playerOne),
-                    total: filteredPoints.filter { $0.winner.id == match.playerOne.id }.count,
-                    maxPoints: maxPoints
-                )
+                // Player 1 bar with individual legend
+                VStack(alignment: .leading, spacing: 4) {
+                    HorizontalPlayerBarView(
+                        player: match.playerOne,
+                        points: getPointCounts(for: match.playerOne),
+                        total: filteredPoints.filter { $0.winner.id == match.playerOne.id }.count,
+                        maxPoints: maxPoints
+                    )
 
-                // Player 2 bar
-                HorizontalPlayerBarView(
-                    player: match.playerTwo,
-                    points: getPointCounts(for: match.playerTwo),
-                    total: filteredPoints.filter { $0.winner.id == match.playerTwo.id }.count,
-                    maxPoints: maxPoints
-                )
+                    // Individual legend for player 1
+                    let p1Points = getPointCounts(for: match.playerOne)
+                    HStack(spacing: 12) {
+                        PlayerLegendItem(color: .yellow, count: p1Points.aces, text: "Aces")
+                        PlayerLegendItem(color: .teal, count: p1Points.winners, text: "Winners")
+                        PlayerLegendItem(color: .red, count: p1Points.doubleFaults, text: "Double Faults")
+                        PlayerLegendItem(color: .pink, count: p1Points.unforcedErrors, text: "Unforced Errors")
+                        Spacer()
+                    }
+                    .font(.caption2)
+                }
+
+                // Player 2 bar with individual legend
+                VStack(alignment: .leading, spacing: 4) {
+                    HorizontalPlayerBarView(
+                        player: match.playerTwo,
+                        points: getPointCounts(for: match.playerTwo),
+                        total: filteredPoints.filter { $0.winner.id == match.playerTwo.id }.count,
+                        maxPoints: maxPoints
+                    )
+
+                    // Individual legend for player 2
+                    let p2Points = getPointCounts(for: match.playerTwo)
+                    HStack(spacing: 12) {
+                        PlayerLegendItem(color: .yellow, count: p2Points.aces, text: "Aces")
+                        PlayerLegendItem(color: .teal, count: p2Points.winners, text: "Winners")
+                        PlayerLegendItem(color: .red, count: p2Points.doubleFaults, text: "Double Faults")
+                        PlayerLegendItem(color: .pink, count: p2Points.unforcedErrors, text: "Unforced Errors")
+                        Spacer()
+                    }
+                    .font(.caption2)
+                }
             }
-
-            // Legend
-            LegendView()
         }
         .padding(.vertical)
     }
@@ -438,7 +463,7 @@ struct PointsChartView: View {
 
 struct HorizontalPlayerBarView: View {
     let player: Player
-    let points: (dropShotWinners: Int, otherWinners: Int, doubleFaults: Int, unforcedErrors: Int, unknown: Int)
+    let points: (aces: Int, winners: Int, doubleFaults: Int, unforcedErrors: Int)
     let total: Int
     let maxPoints: Int
 
@@ -463,25 +488,18 @@ struct HorizontalPlayerBarView: View {
                     if total > 0 {
                         let totalWidth = geometry.size.width * (CGFloat(total) / CGFloat(maxPoints))
 
-                        // Drop shot winners (teal)
-                        if points.dropShotWinners > 0 {
+                        // Aces (gold)
+                        if points.aces > 0 {
+                            Rectangle()
+                                .fill(Color.yellow)
+                                .frame(width: totalWidth * CGFloat(points.aces) / CGFloat(total))
+                        }
+
+                        // Winners (teal)
+                        if points.winners > 0 {
                             Rectangle()
                                 .fill(Color.teal)
-                                .frame(width: totalWidth * CGFloat(points.dropShotWinners) / CGFloat(total))
-                        }
-
-                        // Other winners (mint)
-                        if points.otherWinners > 0 {
-                            Rectangle()
-                                .fill(Color.mint)
-                                .frame(width: totalWidth * CGFloat(points.otherWinners) / CGFloat(total))
-                        }
-
-                        // Unknown (gray)
-                        if points.unknown > 0 {
-                            Rectangle()
-                                .fill(Color.gray)
-                                .frame(width: totalWidth * CGFloat(points.unknown) / CGFloat(total))
+                                .frame(width: totalWidth * CGFloat(points.winners) / CGFloat(total))
                         }
 
                         // Double faults (red)
@@ -514,30 +532,9 @@ struct HorizontalPlayerBarView: View {
     }
 }
 
-struct LegendView: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Legend:")
-                .font(.caption)
-                .fontWeight(.medium)
-
-            HStack(spacing: 16) {
-                LegendItem(color: .teal, text: "Drop shot winners")
-                LegendItem(color: .mint, text: "Other winners")
-            }
-
-            HStack(spacing: 16) {
-                LegendItem(color: .gray, text: "Unknown")
-                LegendItem(color: .red, text: "Double faults")
-                LegendItem(color: .pink, text: "Unforced errors")
-            }
-        }
-        .font(.caption2)
-    }
-}
-
-struct LegendItem: View {
+struct PlayerLegendItem: View {
     let color: Color
+    let count: Int
     let text: String
 
     var body: some View {
@@ -547,7 +544,168 @@ struct LegendItem: View {
                 .frame(width: 10, height: 10)
                 .cornerRadius(2)
 
-            Text(text)
+            Text("\(count) \(text)")
+        }
+    }
+}
+
+struct PointsPlayedChartView: View {
+    let match: Match
+    let filteredPoints: [Point]
+
+    private func getPointsPlayed(for player: Player) -> (aces: Int, winners: Int, doubleFaults: Int, unforcedErrors: Int) {
+        // Get points where this player ended the point (either won or lost due to their action)
+        let playerActionPoints = filteredPoints.filter { point in
+            // Player won the point with their action
+            if point.winner.id == player.id {
+                return true
+            }
+            // Player lost the point due to their error
+            if point.loser.id == player.id && (point.type == .doubleFault || point.type == .unforcedError) {
+                return true
+            }
+            return false
+        }
+
+        let aces = playerActionPoints.filter { $0.type == .ace && $0.winner.id == player.id }.count
+        let winners = playerActionPoints.filter { $0.type == .winner && $0.winner.id == player.id }.count
+        let doubleFaults = playerActionPoints.filter { $0.type == .doubleFault && $0.loser.id == player.id }.count
+        let unforcedErrors = playerActionPoints.filter { $0.type == .unforcedError && $0.loser.id == player.id }.count
+
+        return (aces, winners, doubleFaults, unforcedErrors)
+    }
+
+    private var maxPointsPlayed: Int {
+        let player1Played = getPointsPlayed(for: match.playerOne)
+        let player1Total = player1Played.aces + player1Played.winners + player1Played.doubleFaults + player1Played.unforcedErrors
+
+        let player2Played = getPointsPlayed(for: match.playerTwo)
+        let player2Total = player2Played.aces + player2Played.winners + player2Played.doubleFaults + player2Played.unforcedErrors
+
+        return max(player1Total, player2Total, 1) // At least 1 to avoid division by zero
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Points ended by this player")
+                .font(.headline)
+
+            VStack(spacing: 16) {
+                // Player 1 bar with individual legend
+                VStack(alignment: .leading, spacing: 4) {
+                    HorizontalPlayerPlayedBarView(
+                        player: match.playerOne,
+                        points: getPointsPlayed(for: match.playerOne),
+                        maxPoints: maxPointsPlayed
+                    )
+
+                    // Individual legend for player 1
+                    let p1Played = getPointsPlayed(for: match.playerOne)
+                    HStack(spacing: 12) {
+                        PlayerLegendItem(color: .yellow, count: p1Played.aces, text: "Aces")
+                        PlayerLegendItem(color: .teal, count: p1Played.winners, text: "Winners")
+                        PlayerLegendItem(color: .red, count: p1Played.doubleFaults, text: "Double Faults")
+                        PlayerLegendItem(color: .pink, count: p1Played.unforcedErrors, text: "Unforced Errors")
+                        Spacer()
+                    }
+                    .font(.caption2)
+                }
+
+                // Player 2 bar with individual legend
+                VStack(alignment: .leading, spacing: 4) {
+                    HorizontalPlayerPlayedBarView(
+                        player: match.playerTwo,
+                        points: getPointsPlayed(for: match.playerTwo),
+                        maxPoints: maxPointsPlayed
+                    )
+
+                    // Individual legend for player 2
+                    let p2Played = getPointsPlayed(for: match.playerTwo)
+                    HStack(spacing: 12) {
+                        PlayerLegendItem(color: .yellow, count: p2Played.aces, text: "Aces")
+                        PlayerLegendItem(color: .teal, count: p2Played.winners, text: "Winners")
+                        PlayerLegendItem(color: .red, count: p2Played.doubleFaults, text: "Double Faults")
+                        PlayerLegendItem(color: .pink, count: p2Played.unforcedErrors, text: "Unforced Errors")
+                        Spacer()
+                    }
+                    .font(.caption2)
+                }
+            }
+        }
+        .padding(.vertical)
+    }
+}
+
+struct HorizontalPlayerPlayedBarView: View {
+    let player: Player
+    let points: (aces: Int, winners: Int, doubleFaults: Int, unforcedErrors: Int)
+    let maxPoints: Int
+
+    private var total: Int {
+        points.aces + points.winners + points.doubleFaults + points.unforcedErrors
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Player name and total
+            HStack {
+                Text(player.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Spacer()
+
+                Text("\(total) shots")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Horizontal bar
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    if total > 0 {
+                        let totalWidth = geometry.size.width * (CGFloat(total) / CGFloat(maxPoints))
+
+                        // Aces (gold)
+                        if points.aces > 0 {
+                            Rectangle()
+                                .fill(Color.yellow)
+                                .frame(width: totalWidth * CGFloat(points.aces) / CGFloat(total))
+                        }
+
+                        // Winners (teal)
+                        if points.winners > 0 {
+                            Rectangle()
+                                .fill(Color.teal)
+                                .frame(width: totalWidth * CGFloat(points.winners) / CGFloat(total))
+                        }
+
+                        // Double faults (red)
+                        if points.doubleFaults > 0 {
+                            Rectangle()
+                                .fill(Color.red)
+                                .frame(width: totalWidth * CGFloat(points.doubleFaults) / CGFloat(total))
+                        }
+
+                        // Unforced errors (pink)
+                        if points.unforcedErrors > 0 {
+                            Rectangle()
+                                .fill(Color.pink)
+                                .frame(width: totalWidth * CGFloat(points.unforcedErrors) / CGFloat(total))
+                        }
+
+                        Spacer()
+                    } else {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 20)
+                        Spacer()
+                    }
+                }
+            }
+            .frame(height: 24)
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(12)
         }
     }
 }

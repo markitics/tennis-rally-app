@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import AppIntents
 
 @main
 struct TennisTrackerApp: App {
@@ -32,6 +33,7 @@ struct TennisTrackerApp: App {
                 .onAppear {
                     requestNotificationPermissions()
                     checkPendingActions()
+                    setupDarwinNotificationListener()
                 }
                 .onOpenURL { url in
                     handleURL(url)
@@ -70,6 +72,14 @@ struct TennisTrackerApp: App {
 
         print("🔗 Processing tennistracker URL with host: '\(url.host ?? "nil")'")
 
+        // Check if this is a silent action (from Live Activity)
+        let urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let isSilent = urlComponents?.queryItems?.contains { $0.name == "silent" && $0.value == "true" } ?? false
+
+        if isSilent {
+            print("🔇 SILENT ACTION: Processing Live Activity button press without UI focus")
+        }
+
         switch url.host {
         case "winner":
             print("🏆 Winner button pressed from Live Activity")
@@ -93,7 +103,59 @@ struct TennisTrackerApp: App {
             print("❓ Unknown URL action: '\(url.host ?? "nil")'")
         }
 
+        // For silent actions, send the app to background after a brief delay
+        if isSilent {
+            print("🔇 SILENT: Scheduling app backgrounding...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("🔇 SILENT: Sending app to background...")
+                // Note: In iOS, apps can't force themselves to background
+                // But we can minimize UI disruption by not showing alerts or navigation
+            }
+        }
+
         print("🔗 URL handling completed [\(timestamp)]")
+    }
+
+    // Set up listener for widget extension Darwin notifications
+    private func setupDarwinNotificationListener() {
+        print("📡 Setting up Darwin notification listener for widget actions...")
+
+        // Use a simpler approach - just register for the notification
+        let center = CFNotificationCenterGetDarwinNotifyCenter()
+
+        CFNotificationCenterAddObserver(
+            center,
+            nil,
+            { _, _, name, _, _ in
+                DispatchQueue.main.async {
+                    // Post a local notification that our app can receive
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("WidgetActionReceived"),
+                        object: nil
+                    )
+                }
+            },
+            "com.tennis.tracker.widgetAction" as CFString,
+            nil,
+            .deliverImmediately
+        )
+
+        // Set up local notification observer
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("WidgetActionReceived"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.handleWidgetNotification()
+        }
+
+        print("📡 ✅ Darwin notification listener set up successfully")
+    }
+
+    // Handle notifications from widget extension
+    private func handleWidgetNotification() {
+        print("📡 RECEIVED DARWIN NOTIFICATION from widget extension")
+        checkPendingActions() // Process any pending actions
     }
 
     // Check for pending actions from Live Activity buttons

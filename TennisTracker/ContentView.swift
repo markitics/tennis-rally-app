@@ -54,7 +54,7 @@ struct ContentView: View {
                 .padding()
 
                 // Main content area
-                Group {
+                VStack {
                     switch selectedTab {
                     case .play:
                         if let match = activeMatch {
@@ -77,6 +77,8 @@ struct ContentView: View {
                     case .settings:
                         SettingsView()
                     }
+
+                    Spacer()
                 }
                 .animation(.default, value: selectedTab)
             }

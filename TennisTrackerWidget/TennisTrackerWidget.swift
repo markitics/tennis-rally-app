@@ -44,7 +44,7 @@ struct TennisMatchLiveActivity: Widget {
 
                 // Action buttons row
                 HStack(spacing: 16) {
-                    Button(intent: WinnerIntent()) {
+                    Link(destination: URL(string: "tennistracker://winner?silent=true")!) {
                         VStack(spacing: 4) {
                             Text("🏆")
                                 .font(.title3)
@@ -55,7 +55,7 @@ struct TennisMatchLiveActivity: Widget {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
 
-                    Button(intent: UnforcedErrorIntent()) {
+                    Link(destination: URL(string: "tennistracker://error?silent=true")!) {
                         VStack(spacing: 4) {
                             Text("🙈")
                                 .font(.title3)
