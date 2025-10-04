@@ -53,13 +53,15 @@ struct PlayView: View {
                     liveActivityManager: liveActivityManager
                 )
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top)
 
             // Timeline navigation at bottom
             TimelineNavigationView(viewModel: viewModel)
                 .padding(.top, 40)
-                .padding(.bottom)
+                .padding(.bottom, 100)
         }
+        .ignoresSafeArea(edges: .bottom)
     }
 
 
@@ -875,6 +877,9 @@ struct GameProgressionView: View {
         let startTime = Date()
         guard !points.isEmpty else { return "" }
 
+        // Check if we're in a tiebreak
+        let isTiebreak = viewModel.derivedState.inTiebreak
+
         var progression = "0-0"
         var p1Score = 0
         var p2Score = 0
@@ -889,15 +894,29 @@ struct GameProgressionView: View {
 
             // Build progression string
             let action = describePoint(point)
-            let (p1Display, p2Display) = pointsToTennisScore(p1Score, p2Score)
+
+            // Use tiebreak or regular scoring
+            let (p1Display, p2Display): (String, String)
+            if isTiebreak {
+                p1Display = String(p1Score)
+                p2Display = String(p2Score)
+            } else {
+                (p1Display, p2Display) = pointsToTennisScore(p1Score, p2Score)
+            }
             let newScore = "\(p1Display)-\(p2Display)"
 
-            // Check if game is won
-            let gameWon = (p1Score >= 4 || p2Score >= 4) && abs(p1Score - p2Score) >= 2
+            // Check if game is won (tiebreak: first to 7 by 2, regular: first to 4 by 2)
+            let gameWon: Bool
+            if isTiebreak {
+                gameWon = (p1Score >= 7 || p2Score >= 7) && abs(p1Score - p2Score) >= 2
+            } else {
+                gameWon = (p1Score >= 4 || p2Score >= 4) && abs(p1Score - p2Score) >= 2
+            }
+
             if gameWon {
                 let gameWinnerName = p1Score > p2Score ? match.playerOne.name : match.playerTwo.name
                 progression += " → \(action) → Game to \(gameWinnerName)"
-            }else{
+            } else {
                 progression += " → \(action) → \(newScore)"
             }
         }

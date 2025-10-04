@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Charts
+import MapKit
 
 struct StatsView: View {
     let matches: [Match]
@@ -60,19 +61,27 @@ struct StatsView: View {
                         default:
                             StatsContentView(
                                 match: match,
-                                filterMode: filterMode,
-                                onEndMatch: { endMatch(match) },
-                                onDeleteMatch: { showingDeleteAlert = true },
-                                onAddNote: { showingNoteEditor = true }
+                                filterMode: filterMode
                             )
                         }
+
+                        // Action buttons (shown for all filter modes)
+                        MatchActionButtonsView(
+                            match: match,
+                            onEndMatch: { endMatch(match) },
+                            onDeleteMatch: { showingDeleteAlert = true },
+                            onAddNote: { showingNoteEditor = true }
+                        )
                     }
                 }
             }
 
             }
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 100)
         }
-        .padding()
+        .ignoresSafeArea(edges: .bottom)
         .onAppear {
             if selectedMatch == nil && !matches.isEmpty {
                 selectedMatch = matches.first
@@ -124,13 +133,17 @@ struct MatchSelectorView: View {
     let matches: [Match]
     @Binding var selectedMatch: Match?
 
+    private var sortedMatches: [Match] {
+        matches.sorted { $0.matchDate > $1.matchDate }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Match")
                 .font(.headline)
 
             Picker("Select Match", selection: $selectedMatch) {
-                ForEach(matches) { match in
+                ForEach(sortedMatches) { match in
                     Text(formatMatchLabel(match))
                         .padding(.vertical, 2)
                         .tag(Optional(match))
@@ -141,9 +154,11 @@ struct MatchSelectorView: View {
     }
 
     private func formatMatchLabel(_ match: Match) -> String {
+        if let title = match.title, !title.isEmpty {
+            return title
+        }
         let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .short
+        dateFormatter.dateFormat = "E d MMM yyyy 'at' HH:mm"
         return dateFormatter.string(from: match.matchDate)
     }
 }
@@ -154,46 +169,127 @@ struct MatchTitleView: View {
     @FocusState private var isTitleFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Editable title
-            TextField(formatDatePlaceholder(match.matchDate), text: $editedTitle)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .textFieldStyle(.plain)
-                .focused($isTitleFocused)
-                .lineLimit(1)
-                .onChange(of: editedTitle) { oldValue, newValue in
-                    // Limit to 80 characters
-                    if newValue.count > 80 {
-                        editedTitle = String(newValue.prefix(80))
+        HStack(alignment: .top, spacing: 12) {
+            // Left side: Title and date
+            VStack(alignment: .leading, spacing: 8) {
+                // Editable title
+                TextField(formatDatePlaceholder(match.matchDate), text: $editedTitle)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .textFieldStyle(.plain)
+                    .focused($isTitleFocused)
+                    .lineLimit(1)
+                    .onChange(of: editedTitle) { oldValue, newValue in
+                        // Limit to 80 characters
+                        if newValue.count > 80 {
+                            editedTitle = String(newValue.prefix(80))
+                        }
+                        // Auto-save
+                        match.title = newValue.isEmpty ? nil : newValue
                     }
-                    // Auto-save
-                    match.title = newValue.isEmpty ? nil : newValue
-                }
-                .onAppear {
-                    editedTitle = match.title ?? ""
-                }
+                    .onChange(of: match.id) { oldValue, newValue in
+                        // Update editedTitle when match changes
+                        editedTitle = match.title ?? ""
+                    }
+                    .onAppear {
+                        editedTitle = match.title ?? ""
+                    }
 
-            // Date subtitle (always visible)
-            Text(formatDateSubtitle(match.matchDate))
-                .font(.caption)
-                .foregroundColor(.secondary)
+                // Date subtitle (always visible)
+                Text(formatDateSubtitle(match.matchDate))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // Right side: Small map if location available
+            if let latitude = match.latitude, let longitude = match.longitude {
+                MapSnapshotView(latitude: latitude, longitude: longitude)
+            }
         }
         .padding(.vertical, 4)
     }
 
     private func formatDatePlaceholder(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
+        formatter.dateFormat = "E d MMM yyyy 'at' HH:mm"
         return formatter.string(from: date)
     }
 
     private func formatDateSubtitle(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateStyle = .long
-        formatter.timeStyle = .short
+        formatter.dateFormat = "EEEE, d MMMM yyyy 'at' HH:mm"
         return "📅 " + formatter.string(from: date)
+    }
+}
+
+struct MapSnapshotView: View {
+    let latitude: Double
+    let longitude: Double
+
+    @State private var region: MKCoordinateRegion
+    @State private var showingFullMap = false
+
+    init(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+        _region = State(initialValue: MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        ))
+    }
+
+    var body: some View {
+        Map(position: .constant(.region(region))) {
+            Marker("Match Location", coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+        }
+        .frame(width: 80, height: 80)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
+        .onTapGesture {
+            showingFullMap = true
+        }
+        .sheet(isPresented: $showingFullMap) {
+            FullMapView(latitude: latitude, longitude: longitude)
+        }
+    }
+}
+
+struct FullMapView: View {
+    let latitude: Double
+    let longitude: Double
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var region: MKCoordinateRegion
+
+    init(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+        _region = State(initialValue: MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+        ))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Map(position: .constant(.region(region))) {
+                Marker("Match Location", coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+            }
+            .navigationTitle("Match Location")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -278,9 +374,6 @@ enum ByGameMode: String, CaseIterable {
 struct StatsContentView: View {
     let match: Match
     let filterMode: FilterMode
-    let onEndMatch: () -> Void
-    let onDeleteMatch: () -> Void
-    let onAddNote: () -> Void
 
     private var filteredPoints: [Point] {
         switch filterMode {
@@ -311,14 +404,6 @@ struct StatsContentView: View {
             StatsTableView(
                 match: match,
                 filterMode: filterMode
-            )
-
-            // Action buttons
-            MatchActionButtonsView(
-                match: match,
-                onEndMatch: onEndMatch,
-                onDeleteMatch: onDeleteMatch,
-                onAddNote: onAddNote
             )
         }
     }
@@ -1077,6 +1162,11 @@ struct ByGamePointsWonView: View {
         return points
     }
 
+    private var maxValue: Int {
+        let allAbsoluteValues = chartPoints.map { abs($0.value) }
+        return allAbsoluteValues.max() ?? 1
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -1118,7 +1208,7 @@ struct ByGamePointsWonView: View {
                         .foregroundStyle(point.color)
                     }
                 }
-                .chartXScale(domain: .automatic(includesZero: true))
+                .chartXScale(domain: -maxValue...maxValue)
                 .chartXAxis {
                     AxisMarks(position: .bottom, values: [0]) { value in
                         AxisValueLabel {
@@ -1229,6 +1319,11 @@ struct ByGamePointsEndedView: View {
         return points
     }
 
+    private var maxValue: Int {
+        let allAbsoluteValues = chartPoints.map { abs($0.value) }
+        return allAbsoluteValues.max() ?? 1
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -1271,7 +1366,7 @@ struct ByGamePointsEndedView: View {
                         .foregroundStyle(point.color)
                     }
                 }
-                .chartXScale(domain: .automatic(includesZero: true))
+                .chartXScale(domain: -maxValue...maxValue)
                 .chartXAxis {
                     AxisMarks(position: .bottom, values: [0]) { value in
                         AxisValueLabel {

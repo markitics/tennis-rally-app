@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import CoreLocation
 
 struct ContentView: View {
     enum Tab: String, CaseIterable, Identifiable {
@@ -40,6 +41,7 @@ struct ContentView: View {
             return LiveActivityManager()
         }
     }()
+    @StateObject private var locationManager = LocationManager()
 
     // Debounce guards for Live Activity button presses
     @State private var lastPointTime: Date = .distantPast
@@ -90,25 +92,8 @@ struct ContentView: View {
             }
             .tag(Tab.settings)
         }
-        .onAppear {
-            // Make tab bar icons larger
-            let appearance = UITabBarAppearance()
-            appearance.configureWithDefaultBackground()
-
-            // Increase icon size
-            let itemAppearance = UITabBarItemAppearance()
-            itemAppearance.normal.iconColor = .systemGray
-            itemAppearance.selected.iconColor = .systemBlue
-
-            appearance.stackedLayoutAppearance = itemAppearance
-            appearance.inlineLayoutAppearance = itemAppearance
-            appearance.compactInlineLayoutAppearance = itemAppearance
-
-            UITabBar.appearance().standardAppearance = appearance
-            if #available(iOS 15.0, *) {
-                UITabBar.appearance().scrollEdgeAppearance = appearance
-            }
-        }
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .task {
             ensureMatchSelection()
         }
@@ -286,6 +271,10 @@ struct ContentView: View {
 
     private func createNewMatch(firstServer: Player) {
         print("🎾 DEBUG: createNewMatch called with server: \(firstServer.name)")
+
+        // Request fresh location for this match
+        locationManager.requestLocation()
+
         let player1: Player
         let player2: Player
 
@@ -307,7 +296,9 @@ struct ContentView: View {
         let newMatch = Match(
             playerOne: player1,
             playerTwo: player2,
-            firstServerID: actualFirstServerID
+            firstServerID: actualFirstServerID,
+            latitude: locationManager.currentLocation?.coordinate.latitude,
+            longitude: locationManager.currentLocation?.coordinate.longitude
         )
 
         modelContext.insert(newMatch)

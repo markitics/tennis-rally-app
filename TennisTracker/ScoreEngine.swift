@@ -15,6 +15,7 @@ struct DerivedMatchState {
     let currentScoreString: String
     let endScoreString: String
     let setsAndGamesOnly: String // Score without in-game (e.g., "6-4, 3-2")
+    let inTiebreak: Bool
 }
 
 enum ScoreEngine {
@@ -69,7 +70,8 @@ enum ScoreEngine {
             trailerID: trailerID,
             currentScoreString: currentScoreString,
             endScoreString: endScoreString,
-            setsAndGamesOnly: setsAndGamesOnly
+            setsAndGamesOnly: setsAndGamesOnly,
+            inTiebreak: visibleState.inTiebreak
         )
     }
 

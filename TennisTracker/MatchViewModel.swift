@@ -22,7 +22,8 @@ final class MatchViewModel: ObservableObject {
                 trailerID: nil,
                 currentScoreString: "0-0",
                 endScoreString: "0-0",
-                setsAndGamesOnly: "0-0"
+                setsAndGamesOnly: "0-0",
+                inTiebreak: false
             )
         }
 

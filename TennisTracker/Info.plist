@@ -6,6 +6,8 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Tennis Tracker records the location where matches are played to help you remember where you played.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
