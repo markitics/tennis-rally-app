@@ -41,6 +41,10 @@ struct ContentView: View {
         }
     }()
 
+    // Debounce guards for Live Activity button presses
+    @State private var lastPointTime: Date = .distantPast
+    @State private var isProcessingPoint = false
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -95,7 +99,142 @@ struct ContentView: View {
                     matchViewModel.setMatch(match)
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
+                handleWidgetPointAction(notification)
+            }
         }
+    }
+
+    // Handle point recording from Live Activity buttons - works from any tab
+    private func handleWidgetPointAction(_ notification: Notification) {
+        guard let match = activeMatch else {
+            print("❌ No active match to record point")
+            return
+        }
+
+        guard let userInfo = notification.userInfo,
+              let pointTypeString = userInfo["pointType"] as? String,
+              let playerName = userInfo["player"] as? String else {
+            print("❌ Invalid widget action notification")
+            return
+        }
+
+        print("🎯 WIDGET ACTION (ContentView): \(pointTypeString) for \(playerName)")
+
+        // Convert string to PointType
+        let pointType: PointType
+        switch pointTypeString {
+        case "winner":
+            pointType = .winner
+        case "ace":
+            pointType = .ace
+        case "unforcedError":
+            pointType = .unforcedError
+        case "doubleFault":
+            pointType = .doubleFault
+        default:
+            print("❌ Unknown point type: \(pointTypeString)")
+            return
+        }
+
+        // Find the player - resolve "server" to actual current server
+        let player: Player
+        if playerName == "server" {
+            let serverID = ScoreEngine.currentServerID(
+                visiblePoints: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID,
+                tiebreakFirstServers: match.tiebreakFirstServers
+            )
+            player = (serverID == match.playerOne.id) ? match.playerOne : match.playerTwo
+        } else if playerName == match.playerOne.name {
+            player = match.playerOne
+        } else if playerName == match.playerTwo.name {
+            player = match.playerTwo
+        } else {
+            print("❌ Unknown player: '\(playerName)'")
+            return
+        }
+
+        // Record the point directly
+        recordPoint(match: match, player: player, type: pointType)
+    }
+
+    private func recordPoint(match: Match, player: Player, type: PointType) {
+        // Debounce rapid button presses
+        let now = Date()
+        guard now.timeIntervalSince(lastPointTime) > 0.1 else {
+            print("⏭️ Ignoring rapid tap (debounce)")
+            return
+        }
+        lastPointTime = now
+
+        // Prevent concurrent point processing
+        guard !isProcessingPoint else {
+            print("🔒 Already processing a point, ignoring")
+            return
+        }
+        isProcessingPoint = true
+        defer { isProcessingPoint = false }
+
+        print("🎯 ContentView: Recording point - \(type.rawValue) by \(player.name)")
+
+        // Determine winner/loser based on point type
+        let winner: Player
+        let loser: Player
+        switch type {
+        case .doubleFault, .unforcedError:
+            winner = (player.id == match.playerOne.id) ? match.playerTwo : match.playerOne
+            loser = player
+        case .ace, .winner:
+            winner = player
+            loser = (player.id == match.playerOne.id) ? match.playerTwo : match.playerOne
+        }
+
+        // Get current set and game numbers
+        let setNumber = ScoreEngine.currentSetNumber(
+            from: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+            p1: match.playerOne.id,
+            p2: match.playerTwo.id
+        )
+        let gameNumber = ScoreEngine.currentGameNumber(
+            from: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+            p1: match.playerOne.id,
+            p2: match.playerTwo.id
+        )
+
+        // Create and insert point
+        let newPoint = Point(
+            match: match,
+            winner: winner,
+            loser: loser,
+            type: type,
+            setNumber: setNumber,
+            gameNumber: gameNumber
+        )
+
+        modelContext.insert(newPoint)
+        matchViewModel.cursor = match.sortedPoints.count
+
+        // Update Live Activity
+        if #available(iOS 16.1, *) {
+            let derivedState = matchViewModel.derivedState
+            let serverID = ScoreEngine.currentServerID(
+                visiblePoints: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID,
+                tiebreakFirstServers: match.tiebreakFirstServers
+            )
+            let serverName = serverID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+            liveActivityManager.updateMatchActivity(
+                derivedState: derivedState,
+                serverName: serverName
+            )
+        }
+
+        print("🎯 Point recorded from widget (via ContentView)")
     }
 
     private func ensureMatchSelection() {

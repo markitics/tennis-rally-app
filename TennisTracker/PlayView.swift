@@ -312,13 +312,6 @@ struct PointInputView: View {
                 recordPoint(player: player, type: type)
             }
         )
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
-            print("🔔 NOTIFICATION RECEIVED: onReceive triggered!")
-            handleWidgetPointAction(notification)
-        }
-        .onAppear {
-            print("📱 PointInputView appeared - notification listener is active")
-        }
     }
 
     private func recordPoint(player: Player, type: PointType) {
@@ -597,83 +590,6 @@ struct PointInputView: View {
             // Multiple sets like "6-3, 6-4, 2-1" - last is current set games
             return parts.last ?? ""
         }
-    }
-
-    // Handle point recording from Live Activity buttons
-    private func handleWidgetPointAction(_ notification: Notification) {
-        let timestamp = Date()
-        print("🎯 WIDGET ACTION HANDLER [\(timestamp)]: Function called!")
-        print("🎯 WIDGET ACTION HANDLER: Notification name: '\(notification.name)'")
-        print("🎯 WIDGET ACTION HANDLER: Notification object: \(notification.object ?? "nil")")
-        print("🎯 WIDGET ACTION HANDLER: UserInfo: \(notification.userInfo ?? [:])")
-
-        guard let userInfo = notification.userInfo,
-              let pointTypeString = userInfo["pointType"] as? String,
-              let playerName = userInfo["player"] as? String else {
-            print("❌ Invalid widget action notification")
-            print("❌ userInfo exists: \(notification.userInfo != nil)")
-            print("❌ pointType: '\(notification.userInfo?["pointType"] ?? "nil")'")
-            print("❌ player: '\(notification.userInfo?["player"] ?? "nil")'")
-            return
-        }
-
-        print("🎯 WIDGET ACTION: \(pointTypeString) for \(playerName)")
-
-        // Convert string to PointType
-        let pointType: PointType
-        switch pointTypeString {
-        case "winner":
-            pointType = .winner
-            print("🎯 Converted to: .winner")
-        case "ace":
-            pointType = .ace
-            print("🎯 Converted to: .ace")
-        case "unforcedError":
-            pointType = .unforcedError
-            print("🎯 Converted to: .unforcedError")
-        case "doubleFault":
-            pointType = .doubleFault
-            print("🎯 Converted to: .doubleFault")
-        default:
-            print("❌ Unknown point type: \(pointTypeString)")
-            return
-        }
-
-        // Find the player - resolve "server" to actual current server
-        let player: Player
-        print("🎯 Looking for player '\(playerName)'")
-        print("🎯 Available players: '\(match.playerOne.name)' vs '\(match.playerTwo.name)'")
-
-        if playerName == "server" {
-            // Resolve current server
-            print("🎯 Resolving 'server' to actual current server...")
-            let serverID = ScoreEngine.currentServerID(
-                visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
-                p1: match.playerOne.id,
-                p2: match.playerTwo.id,
-                firstServerID: match.firstServerID
-            )
-            player = (serverID == match.playerOne.id) ? match.playerOne : match.playerTwo
-            print("🎯 Current server is: \(player.name)")
-        } else if playerName == match.playerOne.name {
-            player = match.playerOne
-            print("🎯 Found player: \(match.playerOne.name) (Player One)")
-        } else if playerName == match.playerTwo.name {
-            player = match.playerTwo
-            print("🎯 Found player: \(match.playerTwo.name) (Player Two)")
-        } else {
-            print("❌ Unknown player: '\(playerName)'")
-            print("❌ Expected: '\(match.playerOne.name)', '\(match.playerTwo.name)', or 'server'")
-            return
-        }
-
-        print("🎯 RECORDING POINT: \(pointType.rawValue) for \(player.name)")
-        print("🎯 About to call recordPoint...")
-
-        // Record the point using existing logic
-        recordPoint(player: player, type: pointType)
-
-        print("🎯 ✅ recordPoint completed [\(timestamp)]")
     }
 }
 

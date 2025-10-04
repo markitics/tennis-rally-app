@@ -25,18 +25,10 @@ struct TennisMatchLiveActivity: Widget {
 
                     // Server status - at 0-0 show who's about to serve, otherwise show who's serving
                     let isGameStart = context.state.inGameScoreP1 == "0" && context.state.inGameScoreP2 == "0"
-                    if isGameStart {
-                        let otherPlayer = context.state.serverName == context.state.playerOneName ? context.state.playerTwoName : context.state.playerOneName
-                        Text(otherPlayer + "\nto serve")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                    } else {
-                        Text(context.state.serverName + "\nserving")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                    }
+                    Text(context.state.serverName + (isGameStart ? "\nto serve" : "\nserving"))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
 
                     // Current game score - one size smaller (title2 instead of title)
                     HStack(spacing: 2) {
