@@ -47,6 +47,10 @@ struct ContentView: View {
     @State private var lastPointTime: Date = .distantPast
     @State private var isProcessingPoint = false
 
+    // Track processed action IDs to detect duplicates
+    private static var processedActionIDs: [String: Date] = [:]
+    private static let actionIDCleanupInterval: TimeInterval = 5.0  // Clean up old IDs after 5 seconds
+
     var body: some View {
         TabView(selection: $selectedTab) {
             // Play tab
@@ -124,7 +128,35 @@ struct ContentView: View {
             return
         }
 
-        print("🎯 WIDGET ACTION (ContentView): \(pointTypeString) for \(playerName)")
+        // Extract action ID and timestamp for logging
+        let actionID = userInfo["actionID"] as? String ?? "UNKNOWN"
+        let intentTimestamp = userInfo["timestamp"] as? TimeInterval ?? 0
+        let now = Date().timeIntervalSince1970
+        let timeSinceIntent = now - intentTimestamp
+
+        print("📥 WIDGET ACTION RECEIVED - ID: \(actionID)")
+        print("📥   Point type: \(pointTypeString), Player: \(playerName)")
+        print("📥   Time since intent: \(String(format: "%.3f", timeSinceIntent * 1000))ms")
+        print("📥   Current point count: \(match.sortedPoints.count)")
+
+        // Check for duplicate action ID
+        let currentTime = Date()
+        if let previousTime = ContentView.processedActionIDs[actionID] {
+            let timeSincePrevious = currentTime.timeIntervalSince(previousTime)
+            print("⚠️ DUPLICATE ACTION ID DETECTED!")
+            print("⚠️   Action ID: \(actionID)")
+            print("⚠️   Time since first occurrence: \(String(format: "%.3f", timeSincePrevious * 1000))ms")
+            print("⚠️   REJECTING duplicate action")
+            return
+        }
+
+        // Record this action ID
+        ContentView.processedActionIDs[actionID] = currentTime
+
+        // Clean up old action IDs (older than 5 seconds)
+        let cutoffTime = currentTime.addingTimeInterval(-ContentView.actionIDCleanupInterval)
+        ContentView.processedActionIDs = ContentView.processedActionIDs.filter { $0.value > cutoffTime }
+        print("📥   Tracked action IDs: \(ContentView.processedActionIDs.count)")
 
         // Convert string to PointType
         let pointType: PointType
@@ -167,23 +199,33 @@ struct ContentView: View {
     }
 
     private func recordPoint(match: Match, player: Player, type: PointType) {
+        let entryTime = Date()
+        let timeSinceLastPoint = entryTime.timeIntervalSince(lastPointTime)
+
+        print("🎯 RECORD POINT START")
+        print("🎯   Type: \(type.rawValue), Player: \(player.name)")
+        print("🎯   Time since last point: \(String(format: "%.3f", timeSinceLastPoint * 1000))ms")
+        print("🎯   Current cursor: \(matchViewModel.cursor)")
+        print("🎯   isProcessingPoint: \(isProcessingPoint)")
+
         // Debounce rapid button presses (500ms = 0.5 seconds)
-        let now = Date()
-        guard now.timeIntervalSince(lastPointTime) > 0.5 else {
-            print("⏭️ Ignoring rapid tap (debounce - too fast, wait 500ms)")
+        guard timeSinceLastPoint > 0.5 else {
+            print("⏭️ DEBOUNCE REJECTION - Too fast!")
+            print("⏭️   Elapsed: \(String(format: "%.3f", timeSinceLastPoint * 1000))ms (need 500ms)")
             return
         }
-        lastPointTime = now
+        lastPointTime = entryTime
 
         // Prevent concurrent point processing
         guard !isProcessingPoint else {
-            print("🔒 Already processing a point, ignoring")
+            print("🔒 LOCK REJECTION - Already processing a point!")
             return
         }
         isProcessingPoint = true
-        defer { isProcessingPoint = false }
-
-        print("🎯 ContentView: Recording point - \(type.rawValue) by \(player.name)")
+        defer {
+            isProcessingPoint = false
+            print("🎯   isProcessingPoint released")
+        }
 
         // Determine winner/loser based on point type
         let winner: Player
@@ -220,26 +262,49 @@ struct ContentView: View {
         )
 
         modelContext.insert(newPoint)
-        matchViewModel.cursor = match.sortedPoints.count
+
+        // CRITICAL: Increment cursor from known position, don't query SwiftData
+        // SwiftData hasn't committed yet, so match.sortedPoints.count is stale
+        matchViewModel.cursor = matchViewModel.cursor + 1
+        print("🎯   Cursor advanced to: \(matchViewModel.cursor)")
 
         // Update Live Activity
         if #available(iOS 16.1, *) {
-            let derivedState = matchViewModel.derivedState
+            // CRITICAL: Include uncommitted point in derived state calculation
+            // SwiftData hasn't committed newPoint yet, so we must manually include it
+            let committedPoints = Array(match.sortedPoints)
+            let visiblePointsWithNew = committedPoints + [newPoint]
+
+            print("🎯   Computing Live Activity state:")
+            print("🎯     Committed points: \(committedPoints.count)")
+            print("🎯     With new point: \(visiblePointsWithNew.count)")
+
+            let derivedState = ScoreEngine.compute(
+                visiblePoints: visiblePointsWithNew,
+                fullPoints: visiblePointsWithNew,
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID
+            )
+
             let serverID = ScoreEngine.currentServerID(
-                visiblePoints: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+                visiblePoints: visiblePointsWithNew,
                 p1: match.playerOne.id,
                 p2: match.playerTwo.id,
                 firstServerID: match.firstServerID,
                 tiebreakFirstServers: match.tiebreakFirstServers
             )
             let serverName = serverID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+
+            print("🎯     Computed score: \(derivedState.currentScoreString)")
+
             liveActivityManager.updateMatchActivity(
                 derivedState: derivedState,
                 serverName: serverName
             )
         }
 
-        print("🎯 Point recorded from widget (via ContentView)")
+        print("🎯 RECORD POINT COMPLETE - Success!")
     }
 
     private func ensureMatchSelection() {

@@ -15,9 +15,13 @@ struct WinnerIntent: LiveActivityIntent {
     static var description = IntentDescription("Record a winner point for Mark")
 
     func perform() async throws -> some IntentResult {
-        print("🏆 WINNER: Running in MAIN APP process!")
-        print("🏆 Bundle: \(Bundle.main.bundleIdentifier ?? "nil")")
-        print("🏆 Process: \(ProcessInfo.processInfo.processName)")
+        let actionID = UUID().uuidString
+        let timestamp = Date().timeIntervalSince1970
+
+        print("🏆 WINNER INTENT START - ID: \(actionID)")
+        print("🏆   Timestamp: \(timestamp)")
+        print("🏆   Bundle: \(Bundle.main.bundleIdentifier ?? "nil")")
+        print("🏆   Process: \(ProcessInfo.processInfo.processName)")
 
         // Post notification for PlayView to handle
         // This works because we're in the MAIN APP process!
@@ -25,9 +29,14 @@ struct WinnerIntent: LiveActivityIntent {
             NotificationCenter.default.post(
                 name: NSNotification.Name("RecordPointFromWidget"),
                 object: nil,
-                userInfo: ["pointType": "winner", "player": "Mark"]
+                userInfo: [
+                    "pointType": "winner",
+                    "player": "Mark",
+                    "actionID": actionID,
+                    "timestamp": timestamp
+                ]
             )
-            print("🏆 Posted notification - PlayView will handle it!")
+            print("🏆 WINNER INTENT END - Posted notification with ID: \(actionID)")
         }
 
         return .result()
@@ -40,18 +49,27 @@ struct UnforcedErrorIntent: LiveActivityIntent {
     static var description = IntentDescription("Record an unforced error by Mark")
 
     func perform() async throws -> some IntentResult {
-        print("🙈 ERROR: Running in MAIN APP process!")
-        print("🙈 Bundle: \(Bundle.main.bundleIdentifier ?? "nil")")
-        print("🙈 Process: \(ProcessInfo.processInfo.processName)")
+        let actionID = UUID().uuidString
+        let timestamp = Date().timeIntervalSince1970
+
+        print("🙈 ERROR INTENT START - ID: \(actionID)")
+        print("🙈   Timestamp: \(timestamp)")
+        print("🙈   Bundle: \(Bundle.main.bundleIdentifier ?? "nil")")
+        print("🙈   Process: \(ProcessInfo.processInfo.processName)")
 
         // Post notification for PlayView to handle
         await MainActor.run {
             NotificationCenter.default.post(
                 name: NSNotification.Name("RecordPointFromWidget"),
                 object: nil,
-                userInfo: ["pointType": "unforcedError", "player": "Mark"]
+                userInfo: [
+                    "pointType": "unforcedError",
+                    "player": "Mark",
+                    "actionID": actionID,
+                    "timestamp": timestamp
+                ]
             )
-            print("🙈 Posted notification - PlayView will handle it!")
+            print("🙈 ERROR INTENT END - Posted notification with ID: \(actionID)")
         }
 
         return .result()
@@ -64,15 +82,24 @@ struct AceIntent: LiveActivityIntent {
     static var description = IntentDescription("Record an ace")
 
     func perform() async throws -> some IntentResult {
-        print("🎾 ACE: Running in MAIN APP process!")
+        let actionID = UUID().uuidString
+        let timestamp = Date().timeIntervalSince1970
+
+        print("🎾 ACE INTENT START - ID: \(actionID)")
+        print("🎾   Timestamp: \(timestamp)")
 
         await MainActor.run {
             NotificationCenter.default.post(
                 name: NSNotification.Name("RecordPointFromWidget"),
                 object: nil,
-                userInfo: ["pointType": "ace", "player": "server"]
+                userInfo: [
+                    "pointType": "ace",
+                    "player": "server",
+                    "actionID": actionID,
+                    "timestamp": timestamp
+                ]
             )
-            print("🎾 Posted ACE notification!")
+            print("🎾 ACE INTENT END - Posted notification with ID: \(actionID)")
         }
 
         return .result()
@@ -85,15 +112,24 @@ struct DoubleFaultIntent: LiveActivityIntent {
     static var description = IntentDescription("Record a double fault")
 
     func perform() async throws -> some IntentResult {
-        print("💥 DOUBLE FAULT: Running in MAIN APP process!")
+        let actionID = UUID().uuidString
+        let timestamp = Date().timeIntervalSince1970
+
+        print("💥 DF INTENT START - ID: \(actionID)")
+        print("💥   Timestamp: \(timestamp)")
 
         await MainActor.run {
             NotificationCenter.default.post(
                 name: NSNotification.Name("RecordPointFromWidget"),
                 object: nil,
-                userInfo: ["pointType": "doubleFault", "player": "server"]
+                userInfo: [
+                    "pointType": "doubleFault",
+                    "player": "server",
+                    "actionID": actionID,
+                    "timestamp": timestamp
+                ]
             )
-            print("💥 Posted DOUBLE FAULT notification!")
+            print("💥 DF INTENT END - Posted notification with ID: \(actionID)")
         }
 
         return .result()
@@ -106,15 +142,24 @@ struct JeffWinnerIntent: LiveActivityIntent {
     static var description = IntentDescription("Record a winner by Jeff")
 
     func perform() async throws -> some IntentResult {
-        print("🏆 JEFF WINNER: Running in MAIN APP process!")
+        let actionID = UUID().uuidString
+        let timestamp = Date().timeIntervalSince1970
+
+        print("🏆 JEFF WINNER INTENT START - ID: \(actionID)")
+        print("🏆   Timestamp: \(timestamp)")
 
         await MainActor.run {
             NotificationCenter.default.post(
                 name: NSNotification.Name("RecordPointFromWidget"),
                 object: nil,
-                userInfo: ["pointType": "winner", "player": "Jeff"]
+                userInfo: [
+                    "pointType": "winner",
+                    "player": "Jeff",
+                    "actionID": actionID,
+                    "timestamp": timestamp
+                ]
             )
-            print("🏆 Posted JEFF WINNER notification!")
+            print("🏆 JEFF WINNER INTENT END - Posted notification with ID: \(actionID)")
         }
 
         return .result()
@@ -127,15 +172,24 @@ struct JeffErrorIntent: LiveActivityIntent {
     static var description = IntentDescription("Record an unforced error by Jeff")
 
     func perform() async throws -> some IntentResult {
-        print("🙈 JEFF ERROR: Running in MAIN APP process!")
+        let actionID = UUID().uuidString
+        let timestamp = Date().timeIntervalSince1970
+
+        print("🙈 JEFF ERROR INTENT START - ID: \(actionID)")
+        print("🙈   Timestamp: \(timestamp)")
 
         await MainActor.run {
             NotificationCenter.default.post(
                 name: NSNotification.Name("RecordPointFromWidget"),
                 object: nil,
-                userInfo: ["pointType": "unforcedError", "player": "Jeff"]
+                userInfo: [
+                    "pointType": "unforcedError",
+                    "player": "Jeff",
+                    "actionID": actionID,
+                    "timestamp": timestamp
+                ]
             )
-            print("🙈 Posted JEFF ERROR notification!")
+            print("🙈 JEFF ERROR INTENT END - Posted notification with ID: \(actionID)")
         }
 
         return .result()

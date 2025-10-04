@@ -1288,7 +1288,7 @@ struct ByGamePointsWonView: View {
                                     .font(.caption2)
                                     .fontWeight(.medium)
                             }
-                            .frame(height: 18)
+                            .frame(height: 18, alignment: .center)
                         }
                     }
                     .padding(.horizontal, 8)
@@ -1494,7 +1494,7 @@ struct ByGamePointsEndedView: View {
                                     .font(.caption2)
                                     .fontWeight(.medium)
                             }
-                            .frame(height: 18)
+                            .frame(height: 18, alignment: .center)
                         }
                     }
                     .padding(.horizontal, 8)
