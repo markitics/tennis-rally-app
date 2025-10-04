@@ -1115,10 +1115,13 @@ struct ByGamePointsWonView: View {
         let gameNumber: Int
         let p1Aces: Int
         let p1Winners: Int
-        let p1OpponentErrors: Int  // Points won from opponent's errors
+        let p1OpponentDoubleFaults: Int
+        let p1OpponentUnforcedErrors: Int
         let p2Aces: Int
         let p2Winners: Int
-        let p2OpponentErrors: Int
+        let p2OpponentDoubleFaults: Int
+        let p2OpponentUnforcedErrors: Int
+        let gameScore: String  // e.g., "1-0", "1-1"
 
         var label: String {
             "S\(setNumber)G\(gameNumber)"
@@ -1131,11 +1134,29 @@ struct ByGamePointsWonView: View {
         }
 
         var games: [GameData] = []
+        var currentSetNumber = 0
+        var p1GamesWon = 0
+        var p2GamesWon = 0
+
         for (key, points) in groupedPoints.sorted(by: { $0.key < $1.key }) {
             guard let firstPoint = points.first else { continue }
 
+            // Reset game count when entering new set
+            if firstPoint.setNumber != currentSetNumber {
+                currentSetNumber = firstPoint.setNumber
+                p1GamesWon = 0
+                p2GamesWon = 0
+            }
+
             let p1WonPoints = points.filter { $0.winner.id == match.playerOne.id }
             let p2WonPoints = points.filter { $0.winner.id == match.playerTwo.id }
+
+            // Determine game winner
+            if p1WonPoints.count > p2WonPoints.count {
+                p1GamesWon += 1
+            } else {
+                p2GamesWon += 1
+            }
 
             games.append(GameData(
                 id: key,
@@ -1143,10 +1164,13 @@ struct ByGamePointsWonView: View {
                 gameNumber: firstPoint.gameNumber,
                 p1Aces: p1WonPoints.filter { $0.type == .ace }.count,
                 p1Winners: p1WonPoints.filter { $0.type == .winner }.count,
-                p1OpponentErrors: p1WonPoints.filter { $0.type == .doubleFault || $0.type == .unforcedError }.count,
+                p1OpponentDoubleFaults: p1WonPoints.filter { $0.type == .doubleFault }.count,
+                p1OpponentUnforcedErrors: p1WonPoints.filter { $0.type == .unforcedError }.count,
                 p2Aces: p2WonPoints.filter { $0.type == .ace }.count,
                 p2Winners: p2WonPoints.filter { $0.type == .winner }.count,
-                p2OpponentErrors: p2WonPoints.filter { $0.type == .doubleFault || $0.type == .unforcedError }.count
+                p2OpponentDoubleFaults: p2WonPoints.filter { $0.type == .doubleFault }.count,
+                p2OpponentUnforcedErrors: p2WonPoints.filter { $0.type == .unforcedError }.count,
+                gameScore: "\(p1GamesWon)-\(p2GamesWon)"
             ))
         }
 
@@ -1171,14 +1195,16 @@ struct ByGamePointsWonView: View {
 
         for game in gameDataList {
             // Player 1 (Mark) on the left (negative values)
-            points.append(ChartPoint(game: game.label, type: "P1OppErr", value: -game.p1OpponentErrors, color: .pink))
-            points.append(ChartPoint(game: game.label, type: "P1W", value: -game.p1Winners, color: .green))
-            points.append(ChartPoint(game: game.label, type: "P1A", value: -game.p1Aces, color: .yellow))
+            points.append(ChartPoint(game: game.label, type: "P1OppUE", value: -game.p1OpponentUnforcedErrors, color: Color(red: 1.0, green: 0.7, blue: 0.8)))
+            points.append(ChartPoint(game: game.label, type: "P1OppDF", value: -game.p1OpponentDoubleFaults, color: Color(red: 0.7, green: 0.0, blue: 0.0)))
+            points.append(ChartPoint(game: game.label, type: "P1W", value: -game.p1Winners, color: Color(red: 0.5, green: 0.9, blue: 0.5)))
+            points.append(ChartPoint(game: game.label, type: "P1A", value: -game.p1Aces, color: Color(red: 0.2, green: 0.7, blue: 0.3)))
 
             // Player 2 (Jeff) on the right (positive values)
-            points.append(ChartPoint(game: game.label, type: "P2OppErr", value: game.p2OpponentErrors, color: .pink))
-            points.append(ChartPoint(game: game.label, type: "P2W", value: game.p2Winners, color: .green))
-            points.append(ChartPoint(game: game.label, type: "P2A", value: game.p2Aces, color: .yellow))
+            points.append(ChartPoint(game: game.label, type: "P2OppUE", value: game.p2OpponentUnforcedErrors, color: Color(red: 1.0, green: 0.7, blue: 0.8)))
+            points.append(ChartPoint(game: game.label, type: "P2OppDF", value: game.p2OpponentDoubleFaults, color: Color(red: 0.7, green: 0.0, blue: 0.0)))
+            points.append(ChartPoint(game: game.label, type: "P2W", value: game.p2Winners, color: Color(red: 0.5, green: 0.9, blue: 0.5)))
+            points.append(ChartPoint(game: game.label, type: "P2A", value: game.p2Aces, color: Color(red: 0.2, green: 0.7, blue: 0.3)))
         }
 
         return points
@@ -1213,9 +1239,10 @@ struct ByGamePointsWonView: View {
                 .padding(.horizontal)
 
                 HStack(spacing: 12) {
-                    LegendItem(color: .yellow, text: "Aces")
-                    LegendItem(color: .green, text: "Winners")
-                    LegendItem(color: .pink, text: "Opp. Errors")
+                    LegendItem(color: Color(red: 0.2, green: 0.7, blue: 0.3), text: "Aces")
+                    LegendItem(color: Color(red: 0.5, green: 0.9, blue: 0.5), text: "Winners")
+                    LegendItem(color: Color(red: 0.7, green: 0.0, blue: 0.0), text: "Opp. DFs")
+                    LegendItem(color: Color(red: 1.0, green: 0.7, blue: 0.8), text: "Opp. UEs")
                 }
                 .padding(.horizontal)
                 .font(.caption)
@@ -1239,7 +1266,18 @@ struct ByGamePointsWonView: View {
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
                     }
                 }
-                .frame(height: max(CGFloat(gameDataList.count) * 30, 200))
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisValueLabel(anchor: .leading) {
+                            if let game = value.as(String.self) {
+                                Text(game)
+                                    .foregroundColor(.white)
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: max(CGFloat(gameDataList.count) * 18, 200))
                 .padding(.horizontal)
             }
             .padding(.vertical)
@@ -1326,16 +1364,16 @@ struct ByGamePointsEndedView: View {
 
         for game in gameDataList {
             // Player 1 (Mark) on the left (negative values)
-            points.append(ChartPoint(game: game.label, type: "P1UE", value: -game.p1UnforcedErrors, color: .pink))
-            points.append(ChartPoint(game: game.label, type: "P1DF", value: -game.p1DoubleFaults, color: .red))
-            points.append(ChartPoint(game: game.label, type: "P1W", value: -game.p1Winners, color: .green))
-            points.append(ChartPoint(game: game.label, type: "P1A", value: -game.p1Aces, color: .yellow))
+            points.append(ChartPoint(game: game.label, type: "P1UE", value: -game.p1UnforcedErrors, color: Color(red: 1.0, green: 0.7, blue: 0.8)))
+            points.append(ChartPoint(game: game.label, type: "P1DF", value: -game.p1DoubleFaults, color: Color(red: 0.7, green: 0.0, blue: 0.0)))
+            points.append(ChartPoint(game: game.label, type: "P1W", value: -game.p1Winners, color: Color(red: 0.5, green: 0.9, blue: 0.5)))
+            points.append(ChartPoint(game: game.label, type: "P1A", value: -game.p1Aces, color: Color(red: 0.2, green: 0.7, blue: 0.3)))
 
             // Player 2 (Jeff) on the right (positive values)
-            points.append(ChartPoint(game: game.label, type: "P2UE", value: game.p2UnforcedErrors, color: .pink))
-            points.append(ChartPoint(game: game.label, type: "P2DF", value: game.p2DoubleFaults, color: .red))
-            points.append(ChartPoint(game: game.label, type: "P2W", value: game.p2Winners, color: .green))
-            points.append(ChartPoint(game: game.label, type: "P2A", value: game.p2Aces, color: .yellow))
+            points.append(ChartPoint(game: game.label, type: "P2UE", value: game.p2UnforcedErrors, color: Color(red: 1.0, green: 0.7, blue: 0.8)))
+            points.append(ChartPoint(game: game.label, type: "P2DF", value: game.p2DoubleFaults, color: Color(red: 0.7, green: 0.0, blue: 0.0)))
+            points.append(ChartPoint(game: game.label, type: "P2W", value: game.p2Winners, color: Color(red: 0.5, green: 0.9, blue: 0.5)))
+            points.append(ChartPoint(game: game.label, type: "P2A", value: game.p2Aces, color: Color(red: 0.2, green: 0.7, blue: 0.3)))
         }
 
         return points
@@ -1370,10 +1408,10 @@ struct ByGamePointsEndedView: View {
                 .padding(.horizontal)
 
                 HStack(spacing: 12) {
-                    LegendItem(color: .yellow, text: "Aces")
-                    LegendItem(color: .green, text: "Winners")
-                    LegendItem(color: .red, text: "DF")
-                    LegendItem(color: .pink, text: "UE")
+                    LegendItem(color: Color(red: 0.2, green: 0.7, blue: 0.3), text: "Aces")
+                    LegendItem(color: Color(red: 0.5, green: 0.9, blue: 0.5), text: "Winners")
+                    LegendItem(color: Color(red: 0.7, green: 0.0, blue: 0.0), text: "DF")
+                    LegendItem(color: Color(red: 1.0, green: 0.7, blue: 0.8), text: "UE")
                 }
                 .padding(.horizontal)
                 .font(.caption)
@@ -1397,7 +1435,18 @@ struct ByGamePointsEndedView: View {
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
                     }
                 }
-                .frame(height: max(CGFloat(gameDataList.count) * 30, 200))
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisValueLabel(anchor: .leading) {
+                            if let game = value.as(String.self) {
+                                Text(game)
+                                    .foregroundColor(.white)
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .frame(height: max(CGFloat(gameDataList.count) * 18, 200))
                 .padding(.horizontal)
             }
             .padding(.vertical)
