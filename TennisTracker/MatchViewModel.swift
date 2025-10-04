@@ -21,7 +21,8 @@ final class MatchViewModel: ObservableObject {
                 leaderID: nil,
                 trailerID: nil,
                 currentScoreString: "0-0",
-                endScoreString: "0-0"
+                endScoreString: "0-0",
+                setsAndGamesOnly: "0-0"
             )
         }
 

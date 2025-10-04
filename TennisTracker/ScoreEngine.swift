@@ -14,6 +14,7 @@ struct DerivedMatchState {
     let trailerID: UUID?
     let currentScoreString: String
     let endScoreString: String
+    let setsAndGamesOnly: String // Score without in-game (e.g., "6-4, 3-2")
 }
 
 enum ScoreEngine {
@@ -45,6 +46,14 @@ enum ScoreEngine {
             isTiebreak: false
         )
 
+        // Build sets/games only score (no in-game score)
+        let setsAndGamesOnly = buildScoreString(
+            completedSets: visibleState.completedSets,
+            currentSetGames: visibleState.currentSetGames,
+            inGameDisplay: ("0", "0"),
+            isTiebreak: false
+        )
+
         let (leaderID, trailerID) = determineLeader(
             completedSets: visibleState.completedSets,
             currentSetGames: visibleState.currentSetGames,
@@ -59,7 +68,8 @@ enum ScoreEngine {
             leaderID: leaderID,
             trailerID: trailerID,
             currentScoreString: currentScoreString,
-            endScoreString: endScoreString
+            endScoreString: endScoreString,
+            setsAndGamesOnly: setsAndGamesOnly
         )
     }
 

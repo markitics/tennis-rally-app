@@ -522,9 +522,26 @@ struct PointInputView: View {
 
         // Update Live Activity with new score
         if #available(iOS 16.1, *) {
-            let serverName = currentServerID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+            let derivedState = viewModel.derivedState
+            let serverID = ScoreEngine.currentServerID(
+                visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID,
+                tiebreakFirstServers: match.tiebreakFirstServers
+            )
+            let serverName = serverID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+
+            print("🎾 LIVE ACTIVITY UPDATE:")
+            print("  Score: \(derivedState.currentScoreString)")
+            print("  In-game: \(derivedState.inGameDisplay.p1)-\(derivedState.inGameDisplay.p2)")
+            print("  Server ID: \(serverID)")
+            print("  Server name: \(serverName)")
+            print("  Cursor: \(viewModel.cursor)")
+            print("  Total points: \(match.sortedPoints.count)")
+
             liveActivityManager.updateMatchActivity(
-                currentScore: newScore,
+                derivedState: derivedState,
                 serverName: serverName
             )
         }
@@ -614,17 +631,31 @@ struct PointInputView: View {
         case "unforcedError":
             pointType = .unforcedError
             print("🎯 Converted to: .unforcedError")
+        case "doubleFault":
+            pointType = .doubleFault
+            print("🎯 Converted to: .doubleFault")
         default:
             print("❌ Unknown point type: \(pointTypeString)")
             return
         }
 
-        // Find the player
+        // Find the player - resolve "server" to actual current server
         let player: Player
         print("🎯 Looking for player '\(playerName)'")
         print("🎯 Available players: '\(match.playerOne.name)' vs '\(match.playerTwo.name)'")
 
-        if playerName == match.playerOne.name {
+        if playerName == "server" {
+            // Resolve current server
+            print("🎯 Resolving 'server' to actual current server...")
+            let serverID = ScoreEngine.currentServerID(
+                visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID
+            )
+            player = (serverID == match.playerOne.id) ? match.playerOne : match.playerTwo
+            print("🎯 Current server is: \(player.name)")
+        } else if playerName == match.playerOne.name {
             player = match.playerOne
             print("🎯 Found player: \(match.playerOne.name) (Player One)")
         } else if playerName == match.playerTwo.name {
@@ -632,7 +663,7 @@ struct PointInputView: View {
             print("🎯 Found player: \(match.playerTwo.name) (Player Two)")
         } else {
             print("❌ Unknown player: '\(playerName)'")
-            print("❌ Expected: '\(match.playerOne.name)' or '\(match.playerTwo.name)'")
+            print("❌ Expected: '\(match.playerOne.name)', '\(match.playerTwo.name)', or 'server'")
             return
         }
 

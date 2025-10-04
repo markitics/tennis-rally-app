@@ -87,11 +87,11 @@ struct ContentView: View {
             .task {
                 ensureMatchSelection()
             }
-            .onChange(of: matches) { _ in
+            .onChange(of: matches) {
                 ensureMatchSelection()
             }
-            .onChange(of: activeMatch) { newMatch in
-                if let match = newMatch {
+            .onChange(of: activeMatch) { oldValue, newValue in
+                if let match = newValue {
                     matchViewModel.setMatch(match)
                 }
             }
@@ -174,10 +174,20 @@ struct ContentView: View {
         if #available(iOS 16.1, *) {
             let serverName = firstServer.name
             print("🎾 About to start Live Activity for new match")
+
+            // Compute initial derived state (0-0 at start)
+            let initialState = ScoreEngine.compute(
+                visiblePoints: [],
+                fullPoints: [],
+                p1: newMatch.playerOne.id,
+                p2: newMatch.playerTwo.id,
+                firstServerID: newMatch.firstServerID
+            )
+
             liveActivityManager.startMatchActivity(
                 match: newMatch,
                 serverName: serverName,
-                currentScore: "0-0"
+                derivedState: initialState
             )
         }
     }

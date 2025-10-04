@@ -81,7 +81,7 @@ struct SettingsView: View {
         liveActivityManager.startMatchActivity(
             match: match,
             serverName: serverName,
-            currentScore: state.currentScoreString
+            derivedState: state
         )
     }
 }

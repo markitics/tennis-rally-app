@@ -16,7 +16,7 @@ class LiveActivityManager: ObservableObject {
     private var currentActivity: Activity<TennisMatchAttributes>?
 
     // Start a Live Activity for a tennis match
-    func startMatchActivity(match: Match, serverName: String, currentScore: String) {
+    func startMatchActivity(match: Match, serverName: String, derivedState: DerivedMatchState) {
         // Check if Live Activities are available and enabled
         let authInfo = ActivityAuthorizationInfo()
         print("🎾 Live Activities Auth Status: \(authInfo.areActivitiesEnabled)")
@@ -46,7 +46,10 @@ class LiveActivityManager: ObservableObject {
             let initialState = TennisMatchAttributes.ContentState(
                 playerOneName: match.playerOne.name,
                 playerTwoName: match.playerTwo.name,
-                currentScore: currentScore,
+                currentScore: derivedState.currentScoreString,
+                setsAndGamesScore: derivedState.setsAndGamesOnly,
+                inGameScoreP1: derivedState.inGameDisplay.p1,
+                inGameScoreP2: derivedState.inGameDisplay.p2,
                 serverName: serverName,
                 matchStatus: "In Progress",
                 lastUpdated: Date()
@@ -78,8 +81,8 @@ class LiveActivityManager: ObservableObject {
     }
 
     // Update the Live Activity with new score
-    func updateMatchActivity(currentScore: String, serverName: String) {
-        print("🎾 Attempting to update Live Activity: \(currentScore)")
+    func updateMatchActivity(derivedState: DerivedMatchState, serverName: String) {
+        print("🎾 Attempting to update Live Activity: \(derivedState.currentScoreString)")
         print("🎾 Current activity exists: \(currentActivity != nil)")
         print("🎾 Current activity ID: \(currentActivity?.id ?? "none")")
 
@@ -91,7 +94,10 @@ class LiveActivityManager: ObservableObject {
         let updatedState = TennisMatchAttributes.ContentState(
             playerOneName: activity.content.state.playerOneName,
             playerTwoName: activity.content.state.playerTwoName,
-            currentScore: currentScore,
+            currentScore: derivedState.currentScoreString,
+            setsAndGamesScore: derivedState.setsAndGamesOnly,
+            inGameScoreP1: derivedState.inGameDisplay.p1,
+            inGameScoreP2: derivedState.inGameDisplay.p2,
             serverName: serverName,
             matchStatus: "In Progress",
             lastUpdated: Date()
@@ -99,7 +105,7 @@ class LiveActivityManager: ObservableObject {
 
         Task {
             await activity.update(.init(state: updatedState, staleDate: nil))
-            print("🎾 Live Activity updated: \(currentScore)")
+            print("🎾 Live Activity updated: \(derivedState.currentScoreString)")
 
             // Debug: Check current activity status
             print("🎾 Activity state: \(activity.activityState)")
@@ -119,6 +125,9 @@ class LiveActivityManager: ObservableObject {
             playerOneName: activity.content.state.playerOneName,
             playerTwoName: activity.content.state.playerTwoName,
             currentScore: finalScore ?? activity.content.state.currentScore,
+            setsAndGamesScore: activity.content.state.setsAndGamesScore,
+            inGameScoreP1: activity.content.state.inGameScoreP1,
+            inGameScoreP2: activity.content.state.inGameScoreP2,
             serverName: activity.content.state.serverName,
             matchStatus: "Completed",
             lastUpdated: Date()
