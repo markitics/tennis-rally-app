@@ -42,9 +42,9 @@ struct TennisMatchLiveActivity: Widget {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
-                // Action buttons row
+                // Action buttons row - using AppIntents for lock screen execution
                 HStack(spacing: 16) {
-                    Link(destination: URL(string: "tennistracker://winner?silent=true")!) {
+                    Button(intent: WinnerIntent()) {
                         VStack(spacing: 4) {
                             Text("🏆")
                                 .font(.title3)
@@ -55,7 +55,7 @@ struct TennisMatchLiveActivity: Widget {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
 
-                    Link(destination: URL(string: "tennistracker://error?silent=true")!) {
+                    Button(intent: UnforcedErrorIntent()) {
                         VStack(spacing: 4) {
                             Text("🙈")
                                 .font(.title3)

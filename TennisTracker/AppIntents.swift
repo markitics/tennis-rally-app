@@ -2,123 +2,58 @@
 //  AppIntents.swift
 //  TennisTracker
 //
-//  Shared App Intent definitions for both main app and widget extension
+//  MAIN APP TARGET: LiveActivityIntent implementations that run in app process
+//  These have direct access to SwiftData and can call app functions!
 //
 
 import AppIntents
 import Foundation
 
-// Intent for recording a winner - executes in background
-struct WinnerIntent: AppIntent {
+// MAIN APP: Intent for recording a winner - runs in MAIN APP PROCESS
+struct WinnerIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Record Winner"
     static var description = IntentDescription("Record a winner point for Mark")
-    static var openAppWhenRun: Bool = false // Critical: keeps app closed
 
     func perform() async throws -> some IntentResult {
-        let timestamp = Date()
-        print("🏆 WINNER INTENT [\(timestamp)]: Starting background execution")
+        print("🏆 WINNER: Running in MAIN APP process!")
+        print("🏆 Bundle: \(Bundle.main.bundleIdentifier ?? "nil")")
+        print("🏆 Process: \(ProcessInfo.processInfo.processName)")
 
-        // Add more debugging at the very start
-        print("🏆 WINNER: App Intent is executing - this should appear in console")
-        print("🏆 WINNER: Bundle identifier: \(Bundle.main.bundleIdentifier ?? "nil")")
-        print("🏆 WINNER: Process name: \(ProcessInfo.processInfo.processName)")
-
-        // Save action to App Group UserDefaults for main app to process
-        let defaults = UserDefaults(suiteName: "group.com.markmoriarty.apps.TennisTracker")
-
-        let actionData = [
-            "action": "recordPoint",
-            "pointType": "winner",
-            "player": "Mark",
-            "timestamp": timestamp.timeIntervalSince1970
-        ] as [String: Any]
-
-        print("🏆 WINNER: About to save action data: \(actionData)")
-        print("🏆 WINNER: UserDefaults object: \(defaults != nil ? "EXISTS" : "NIL")")
-
-        defaults?.set(actionData, forKey: "pendingAction")
-        let syncResult = defaults?.synchronize() ?? false
-
-        print("🏆 WINNER: Synchronize result: \(syncResult)")
-
-        // Verify the data was written
-        let readBack = defaults?.dictionary(forKey: "pendingAction")
-        print("🏆 WINNER: Read back from UserDefaults: \(readBack ?? [:])")
-
-        print("🏆 WINNER: Background action saved to shared storage")
-
-        // Trigger main app to check for pending actions using push notification
-        // This will work even when app is backgrounded
-        await triggerMainAppUpdate()
+        // Post notification for PlayView to handle
+        // This works because we're in the MAIN APP process!
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("RecordPointFromWidget"),
+                object: nil,
+                userInfo: ["pointType": "winner", "player": "Mark"]
+            )
+            print("🏆 Posted notification - PlayView will handle it!")
+        }
 
         return .result()
-    }
-
-    private func triggerMainAppUpdate() async {
-        // Use CFNotificationCenter for cross-process communication
-        let center = CFNotificationCenterGetDarwinNotifyCenter()
-        CFNotificationCenterPostNotification(
-            center,
-            CFNotificationName("com.tennis.tracker.widgetAction" as CFString),
-            nil, nil, true
-        )
-        print("🏆 WINNER: Sent darwin notification to main app")
     }
 }
 
-// Intent for recording an unforced error - executes in background
-struct UnforcedErrorIntent: AppIntent {
+// MAIN APP: Intent for recording an unforced error - runs in MAIN APP PROCESS
+struct UnforcedErrorIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Record Unforced Error"
     static var description = IntentDescription("Record an unforced error by Mark")
-    static var openAppWhenRun: Bool = false // Critical: keeps app closed
 
     func perform() async throws -> some IntentResult {
-        let timestamp = Date()
-        print("🙈 ERROR INTENT [\(timestamp)]: Starting background execution")
+        print("🙈 ERROR: Running in MAIN APP process!")
+        print("🙈 Bundle: \(Bundle.main.bundleIdentifier ?? "nil")")
+        print("🙈 Process: \(ProcessInfo.processInfo.processName)")
 
-        // Add more debugging at the very start
-        print("🙈 ERROR: App Intent is executing - this should appear in console")
-        print("🙈 ERROR: Bundle identifier: \(Bundle.main.bundleIdentifier ?? "nil")")
-        print("🙈 ERROR: Process name: \(ProcessInfo.processInfo.processName)")
-
-        // Save action to App Group UserDefaults for main app to process
-        let defaults = UserDefaults(suiteName: "group.com.markmoriarty.apps.TennisTracker")
-
-        let actionData = [
-            "action": "recordPoint",
-            "pointType": "unforcedError",
-            "player": "Mark",
-            "timestamp": timestamp.timeIntervalSince1970
-        ] as [String: Any]
-
-        print("🙈 ERROR: About to save action data: \(actionData)")
-        print("🙈 ERROR: UserDefaults object: \(defaults != nil ? "EXISTS" : "NIL")")
-
-        defaults?.set(actionData, forKey: "pendingAction")
-        let syncResult = defaults?.synchronize() ?? false
-
-        print("🙈 ERROR: Synchronize result: \(syncResult)")
-
-        // Verify the data was written
-        let readBack = defaults?.dictionary(forKey: "pendingAction")
-        print("🙈 ERROR: Read back from UserDefaults: \(readBack ?? [:])")
-
-        print("🙈 ERROR: Background action saved to shared storage")
-
-        // Trigger main app to check for pending actions
-        await triggerMainAppUpdate()
+        // Post notification for PlayView to handle
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: NSNotification.Name("RecordPointFromWidget"),
+                object: nil,
+                userInfo: ["pointType": "unforcedError", "player": "Mark"]
+            )
+            print("🙈 Posted notification - PlayView will handle it!")
+        }
 
         return .result()
-    }
-
-    private func triggerMainAppUpdate() async {
-        // Use CFNotificationCenter for cross-process communication
-        let center = CFNotificationCenterGetDarwinNotifyCenter()
-        CFNotificationCenterPostNotification(
-            center,
-            CFNotificationName("com.tennis.tracker.widgetAction" as CFString),
-            nil, nil, true
-        )
-        print("🙈 ERROR: Sent darwin notification to main app")
     }
 }

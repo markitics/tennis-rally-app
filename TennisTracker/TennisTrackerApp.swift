@@ -32,8 +32,6 @@ struct TennisTrackerApp: App {
             ContentView()
                 .onAppear {
                     requestNotificationPermissions()
-                    checkPendingActions()
-                    setupDarwinNotificationListener()
                 }
                 .onOpenURL { url in
                     handleURL(url)
@@ -114,124 +112,6 @@ struct TennisTrackerApp: App {
         }
 
         print("🔗 URL handling completed [\(timestamp)]")
-    }
-
-    // Set up listener for widget extension Darwin notifications
-    private func setupDarwinNotificationListener() {
-        print("📡 Setting up Darwin notification listener for widget actions...")
-
-        // Use a simpler approach - just register for the notification
-        let center = CFNotificationCenterGetDarwinNotifyCenter()
-
-        CFNotificationCenterAddObserver(
-            center,
-            nil,
-            { _, _, name, _, _ in
-                DispatchQueue.main.async {
-                    // Post a local notification that our app can receive
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("WidgetActionReceived"),
-                        object: nil
-                    )
-                }
-            },
-            "com.tennis.tracker.widgetAction" as CFString,
-            nil,
-            .deliverImmediately
-        )
-
-        // Set up local notification observer
-        NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("WidgetActionReceived"),
-            object: nil,
-            queue: .main
-        ) { _ in
-            self.handleWidgetNotification()
-        }
-
-        print("📡 ✅ Darwin notification listener set up successfully")
-    }
-
-    // Handle notifications from widget extension
-    private func handleWidgetNotification() {
-        print("📡 RECEIVED DARWIN NOTIFICATION from widget extension")
-        checkPendingActions() // Process any pending actions
-    }
-
-    // Check for pending actions from Live Activity buttons
-    private func checkPendingActions() {
-        let timestamp = Date()
-        print("🔍 CHECKING FOR PENDING ACTIONS [\(timestamp)]...")
-
-        // TEST MECHANISM: Simulate a widget action for testing (remove this later)
-        // Uncomment the lines below to test the notification flow without widget
-        /*
-        print("🧪 TEST: Simulating widget action for testing...")
-        NotificationCenter.default.post(
-            name: NSNotification.Name("RecordPointFromWidget"),
-            object: nil,
-            userInfo: ["pointType": "winner", "player": "Mark"]
-        )
-        print("🧪 TEST: Widget action simulation completed")
-        */
-
-        let defaults = UserDefaults(suiteName: "group.com.markmoriarty.apps.TennisTracker")
-        print("🔍 UserDefaults created: \(defaults != nil ? "YES" : "NO")")
-
-        // Always log all available keys for debugging
-        if let allKeys = defaults?.dictionaryRepresentation().keys {
-            let keyArray = Array(allKeys).sorted()
-            print("🔍 ALL UserDefaults keys (\(keyArray.count)): \(keyArray)")
-        } else {
-            print("🔍 No UserDefaults keys found")
-        }
-
-        // Check specifically for pendingAction
-        let pendingAction = defaults?.dictionary(forKey: "pendingAction")
-        print("🔍 Direct pendingAction check: \(pendingAction != nil ? "FOUND" : "NOT FOUND")")
-
-        if let actionData = pendingAction {
-            print("🎯 PENDING ACTION DETECTED: \(actionData)")
-
-            // Extract timestamp for tracking
-            if let timestamp = actionData["timestamp"] as? Double {
-                let actionDate = Date(timeIntervalSince1970: timestamp)
-                let timeDiff = Date().timeIntervalSince(actionDate)
-                print("🎯 Action timestamp: \(actionDate), age: \(timeDiff)s")
-            }
-
-            // Clear the action so it only processes once
-            defaults?.removeObject(forKey: "pendingAction")
-            defaults?.synchronize()
-            print("🎯 Action cleared from UserDefaults")
-
-            // Process the action
-            if let action = actionData["action"] as? String,
-               let pointType = actionData["pointType"] as? String,
-               let player = actionData["player"] as? String,
-               action == "recordPoint" {
-
-                print("🎯 PROCESSING: \(pointType) for \(player)")
-
-                // Post notification so PlayView can handle it
-                print("🎯 Posting NotificationCenter notification...")
-                NotificationCenter.default.post(
-                    name: NSNotification.Name("RecordPointFromWidget"),
-                    object: nil,
-                    userInfo: ["pointType": pointType, "player": player]
-                )
-                print("🎯 ✅ Notification posted successfully")
-            } else {
-                print("❌ Failed to parse action data properly")
-                print("❌ action='\(actionData["action"] ?? "nil")'")
-                print("❌ pointType='\(actionData["pointType"] ?? "nil")'")
-                print("❌ player='\(actionData["player"] ?? "nil")'")
-            }
-        } else {
-            print("🔍 No pending actions found")
-        }
-
-        print("🔍 checkPendingActions completed [\(timestamp)]")
     }
 
     // Send a local notification
