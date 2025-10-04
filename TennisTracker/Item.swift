@@ -35,7 +35,10 @@ final class Match {
     var matchDate: Date
     var firstServerID: UUID
     var isCompleted: Bool = false
+    var title: String?
     var notes: String?
+    var latitude: Double?
+    var longitude: Double?
 
     // Use proper SwiftData relationships
     @Relationship(deleteRule: .cascade, inverse: \Point.match)
@@ -68,7 +71,10 @@ final class Match {
         matchDate: Date = Date(),
         firstServerID: UUID,
         isCompleted: Bool = false,
-        notes: String? = nil
+        title: String? = nil,
+        notes: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil
     ) {
         self.id = id
         self.playerOne = playerOne
@@ -76,7 +82,10 @@ final class Match {
         self.matchDate = matchDate
         self.firstServerID = firstServerID
         self.isCompleted = isCompleted
+        self.title = title
         self.notes = notes
+        self.latitude = latitude
+        self.longitude = longitude
     }
 }
 

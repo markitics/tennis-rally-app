@@ -32,11 +32,21 @@ struct StatsView: View {
                     )
 
                     if let match = selectedMatch {
+                        Divider()
+
+                        // Match title (editable)
+                        MatchTitleView(match: match)
+
+                        Divider()
+
                         // Set selector
                         SetSelectorView(
                             match: match,
                             filterMode: $filterMode
                         )
+
+                        // Match result (shown for all filter modes)
+                        MatchResultView(match: match, filterMode: filterMode)
 
                         switch filterMode {
                         case .byGamePointsWon:
@@ -135,6 +145,121 @@ struct MatchSelectorView: View {
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .short
         return dateFormatter.string(from: match.matchDate)
+    }
+}
+
+struct MatchTitleView: View {
+    let match: Match
+    @State private var editedTitle: String = ""
+    @FocusState private var isTitleFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Editable title
+            TextField(formatDatePlaceholder(match.matchDate), text: $editedTitle)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .textFieldStyle(.plain)
+                .focused($isTitleFocused)
+                .lineLimit(1)
+                .onChange(of: editedTitle) { oldValue, newValue in
+                    // Limit to 80 characters
+                    if newValue.count > 80 {
+                        editedTitle = String(newValue.prefix(80))
+                    }
+                    // Auto-save
+                    match.title = newValue.isEmpty ? nil : newValue
+                }
+                .onAppear {
+                    editedTitle = match.title ?? ""
+                }
+
+            // Date subtitle (always visible)
+            Text(formatDateSubtitle(match.matchDate))
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func formatDatePlaceholder(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    private func formatDateSubtitle(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .short
+        return "📅 " + formatter.string(from: date)
+    }
+}
+
+struct MatchResultView: View {
+    let match: Match
+    let filterMode: FilterMode
+
+    private var scoreInfo: (winner: String?, score: String) {
+        if case .bySet(let setNumber) = filterMode {
+            // Show individual set score
+            let setPoints = match.sortedPoints.filter { $0.setNumber == setNumber }
+            let derivedState = ScoreEngine.compute(
+                visiblePoints: setPoints,
+                fullPoints: setPoints,
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID
+            )
+
+            if let setScore = derivedState.setScores.first {
+                if setScore.p1Games > setScore.p2Games {
+                    return (match.playerOne.name, "Set \(setNumber): \(setScore.p1Games)-\(setScore.p2Games)")
+                } else if setScore.p2Games > setScore.p1Games {
+                    return (match.playerTwo.name, "Set \(setNumber): \(setScore.p1Games)-\(setScore.p2Games)")
+                } else {
+                    return (nil, "Set \(setNumber): \(setScore.p1Games)-\(setScore.p2Games)")
+                }
+            }
+            return (nil, "Set \(setNumber)")
+        } else {
+            // Show full match score
+            let derivedState = ScoreEngine.compute(
+                visiblePoints: match.sortedPoints,
+                fullPoints: match.sortedPoints,
+                p1: match.playerOne.id,
+                p2: match.playerTwo.id,
+                firstServerID: match.firstServerID
+            )
+
+            let p1Sets = derivedState.setScores.filter { $0.p1Games > $0.p2Games }.count
+            let p2Sets = derivedState.setScores.filter { $0.p2Games > $0.p1Games }.count
+
+            let setScoresStr = derivedState.setScores.map { "\($0.p1Games)-\($0.p2Games)" }.joined(separator: ", ")
+
+            if p1Sets > p2Sets {
+                return (match.playerOne.name, setScoresStr)
+            } else if p2Sets > p1Sets {
+                return (match.playerTwo.name, setScoresStr)
+            } else {
+                return (nil, setScoresStr.isEmpty ? "No sets completed" : setScoresStr)
+            }
+        }
+    }
+
+    var body: some View {
+        if let winner = scoreInfo.winner {
+            Text("\(winner) wins: \(scoreInfo.score)")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .padding(.vertical, 8)
+        } else {
+            Text(scoreInfo.score)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .padding(.vertical, 8)
+        }
     }
 }
 
@@ -392,18 +517,6 @@ struct StatsTableView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Final score with winner
-            let scoreInfo = finalScoreWithWinner
-            if let winner = scoreInfo.winner {
-                Text("\(winner) wins: \(scoreInfo.score)")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-            } else {
-                Text(scoreInfo.score)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-            }
-
 //            // Stats for each player -- commented out because we have the charts above
 //            VStack(spacing: 12) {
 //                PlayerStatsView(
@@ -472,46 +585,48 @@ struct MatchActionButtonsView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            if !match.isCompleted {
-                Button("End Match") {
-                    onEndMatch()
-                }
-                .buttonStyle(.bordered)
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity)
-            } else {
-                // Display note if it exists (tappable to edit)
-                if let notes = match.notes, !notes.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Match Notes")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
+            // Display note if it exists (tappable to edit) - shown during AND after match
+            if let notes = match.notes, !notes.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Match Notes")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
 
-                        Button(action: onAddNote) {
-                            Text(notes)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
+                    Button(action: onAddNote) {
+                        Text(notes)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
                     }
-                    .padding(.bottom, 8)
+                    .buttonStyle(.plain)
+                }
+                .padding(.bottom, 8)
+            }
+
+            // Action buttons
+            HStack(spacing: 16) {
+                // Add Note button (only if no note exists)
+                if match.notes?.isEmpty != false {
+                    Button("Add Note") {
+                        onAddNote()
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
                 }
 
-                HStack(spacing: 16) {
-                    // Only show "Add Note" button if no note exists
-                    if match.notes?.isEmpty != false {
-                        Button("Add Note") {
-                            onAddNote()
-                        }
-                        .buttonStyle(.bordered)
-                        .frame(maxWidth: .infinity)
+                // The only conditional: End Match vs Delete Match
+                if !match.isCompleted {
+                    Button("End Match") {
+                        onEndMatch()
                     }
-
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                } else {
                     Button("Delete Match") {
                         onDeleteMatch()
                     }
