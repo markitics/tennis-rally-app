@@ -227,6 +227,10 @@ struct TimelineNavigationView: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            // Progression text above back/forward buttons
+            if let match = viewModel.match {
+                GameProgressionView(match: match, viewModel: viewModel)
+            }
             // Navigation buttons row
             HStack(spacing: 20) {
                 Button(action: animatedBack) {
@@ -259,11 +263,6 @@ struct TimelineNavigationView: View {
                 .disabled(!viewModel.canForward)
                 .scaleEffect(forwardPressed ? 0.95 : 1.0)
                 .animation(.easeInOut(duration: 0.1), value: forwardPressed)
-            }
-
-            // Progression text below (no truncation)
-            if let match = viewModel.match {
-                GameProgressionView(match: match, viewModel: viewModel)
             }
         }
     }
@@ -945,12 +944,14 @@ struct GameProgressionView: View {
             let action = describePoint(point)
             let (p1Display, p2Display) = pointsToTennisScore(p1Score, p2Score)
             let newScore = "\(p1Display)-\(p2Display)"
-            progression += " → \(action) → \(newScore)"
 
             // Check if game is won
             let gameWon = (p1Score >= 4 || p2Score >= 4) && abs(p1Score - p2Score) >= 2
             if gameWon {
-                progression += " (Game)"
+                let gameWinnerName = p1Score > p2Score ? match.playerOne.name : match.playerTwo.name
+                progression += " → \(action) → Game to \(gameWinnerName)"
+            }else{
+                progression += " → \(action) → \(newScore)"
             }
         }
 
@@ -960,14 +961,22 @@ struct GameProgressionView: View {
         return progression
     }
 
-    private var isCurrentScoreZeroZero: Bool {
-        let currentPoints = currentGamePoints
-        return currentPoints.isEmpty
-    }
+    // Helper to check if a set of points represents a completed game
+    private func isGameComplete(points: [Point]) -> Bool {
+        guard !points.isEmpty else { return false }
 
-    private var isFirstGameOfMatch: Bool {
-        // If we have no completed games and current game is at 0-0
-        return lastCompletedGamePoints.isEmpty && currentGamePoints.isEmpty
+        var p1Score = 0
+        var p2Score = 0
+
+        for point in points {
+            if point.winner.id == match.playerOne.id {
+                p1Score += 1
+            } else {
+                p2Score += 1
+            }
+        }
+
+        return (p1Score >= 4 || p2Score >= 4) && abs(p1Score - p2Score) >= 2
     }
 
     var body: some View {
@@ -979,39 +988,36 @@ struct GameProgressionView: View {
                 Text("Match just started")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-            } else if isCurrentScoreZeroZero && !isFirstGameOfMatch {
-                // Show last completed game
-                Text("Last game finished:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(buildProgression(from: lastCompletedGamePoints))
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .onAppear {
-                        let elapsed = Date().timeIntervalSince(renderStart) * 1000
-                        print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
-                    }
-            } else if !currentGamePoints.isEmpty {
-                // Show current game in progress
-                Text("Recent progression:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(buildProgression(from: currentGamePoints))
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .onAppear {
-                        let elapsed = Date().timeIntervalSince(renderStart) * 1000
-                        print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
-                    }
             } else {
-                // First game at 0-0
-                Text("Ready to start first game")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .onAppear {
-                        let elapsed = Date().timeIntervalSince(renderStart) * 1000
-                        print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
-                    }
+                // Build progression and check if it's a completed game
+                let progression = buildProgression(from: currentGamePoints)
+                let isCompletedGame = progression.contains("Game to")
+
+                if isCompletedGame {
+                    // Show completed game
+                    Text("Last game finished:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(progression)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .onAppear {
+                            let elapsed = Date().timeIntervalSince(renderStart) * 1000
+                            print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
+                        }
+                } else {
+                    // Show current game in progress
+                    Text("This game so far:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(progression)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .onAppear {
+                            let elapsed = Date().timeIntervalSince(renderStart) * 1000
+                            print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
+                        }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
