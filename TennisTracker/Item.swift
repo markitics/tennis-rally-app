@@ -40,6 +40,11 @@ final class Match {
     var latitude: Double?
     var longitude: Double?
 
+    // Weather metadata
+    var temperature: Double?  // in Celsius
+    var weatherCondition: String?  // e.g., "Clear", "Cloudy", "Rain"
+    var weatherSymbol: String?  // SF Symbol name for weather icon
+
     // Use proper SwiftData relationships
     @Relationship(deleteRule: .cascade, inverse: \Point.match)
     var points: [Point] = []

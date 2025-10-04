@@ -301,9 +301,34 @@ struct ContentView: View {
             longitude: locationManager.currentLocation?.coordinate.longitude
         )
 
+        print("📍 Match created with location: lat=\(newMatch.latitude?.description ?? "nil"), lon=\(newMatch.longitude?.description ?? "nil")")
+
         modelContext.insert(newMatch)
         selectedMatch = newMatch  // Auto-select the new match in View tab
         showingFirstServerSelection = false
+
+        // Fetch weather asynchronously in the background (non-blocking)
+        // Wait a moment for location to arrive if needed
+        Task {
+            // Give location manager up to 2 seconds to get a fix
+            var attempts = 0
+            while (newMatch.latitude == nil || newMatch.longitude == nil) && attempts < 20 {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                if let currentLoc = locationManager.currentLocation {
+                    newMatch.latitude = currentLoc.coordinate.latitude
+                    newMatch.longitude = currentLoc.coordinate.longitude
+                    print("📍 Location updated: \(currentLoc.coordinate.latitude), \(currentLoc.coordinate.longitude)")
+                }
+                attempts += 1
+            }
+
+            if let lat = newMatch.latitude, let lon = newMatch.longitude {
+                print("🌤️ Location available: \(lat), \(lon) - fetching weather...")
+                await WeatherService.shared.fetchWeather(for: newMatch, latitude: lat, longitude: lon)
+            } else {
+                print("⚠️ No location available for weather fetch after \(attempts) attempts")
+            }
+        }
 
         // Send immediate test notification
         let content = UNMutableNotificationContent()

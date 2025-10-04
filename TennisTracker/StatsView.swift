@@ -199,6 +199,28 @@ struct MatchTitleView: View {
                 Text(formatDateSubtitle(match.matchDate))
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                // Weather info (if available)
+                if let temp = match.temperature,
+                   let condition = match.weatherCondition,
+                   let symbol = match.weatherSymbol {
+                    let fahrenheit = (temp * 9/5) + 32
+                    HStack(spacing: 4) {
+                        Image(systemName: symbol)
+                        Text("\(Int(temp))°C / \(Int(fahrenheit))°F")
+                        Text("·")
+                        Text(condition)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                } else {
+                    // Debug: show if we have location but no weather
+                    if match.latitude != nil && match.longitude != nil {
+                        Text("🌤️ Fetching weather...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
 
             Spacer()
