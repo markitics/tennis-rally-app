@@ -297,6 +297,9 @@ struct PointInputView: View {
 
     @State private var isProcessingPoint = false
     @State private var lastPointTime: Date = Date()
+    @AppStorage("soundEnabled") private var soundEnabled = true
+
+    private let speechSynthesizer = AVSpeechSynthesizer()
 
     var body: some View {
         // Unified context-aware 6-button layout (v4)
@@ -328,17 +331,27 @@ struct PointInputView: View {
             markWins = (player.id == match.playerOne.id)
         }
 
-        // Haptic feedback and sound effects
+        // Determine the speech phrase based on player and point type
+        let speechPhrase: String
+        switch type {
+        case .ace:
+            speechPhrase = "\(player.name) ace"
+        case .winner:
+            speechPhrase = "\(player.name) winner"
+        case .doubleFault:
+            speechPhrase = "\(player.name) double fault"
+        case .unforcedError:
+            speechPhrase = "\(player.name) error"
+        }
+
+        // Haptic feedback and speech
         if markWins {
-            // Mark won - short vibration and cheery ding
+            // Mark won - short vibration
             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
             impactFeedback.prepare()
             impactFeedback.impactOccurred()
-
-            // Play cheery success sound
-            AudioServicesPlaySystemSound(1057) // Tink sound
         } else {
-            // Jeff won - long vibration and sad sound
+            // Jeff won - long vibration
             let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
             impactFeedback.prepare()
             impactFeedback.impactOccurred(intensity: 1.0)
@@ -349,9 +362,14 @@ struct PointInputView: View {
                 continueFeedback.prepare()
                 continueFeedback.impactOccurred(intensity: 0.8)
             }
+        }
 
-            // Play sad/error sound
-            AudioServicesPlaySystemSound(1006) // Low power sound
+        // Play speech (if enabled)
+        if soundEnabled {
+            let utterance = AVSpeechUtterance(string: speechPhrase)
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+            utterance.rate = 0.5 // Slightly faster than default
+            speechSynthesizer.speak(utterance)
         }
 
         // Debounce rapid button presses to prevent crashes
@@ -624,49 +642,50 @@ struct UnifiedButtonsView: View {
     var body: some View {
         VStack(spacing: 24) {
 
-            VStack(spacing: 16) {
+            VStack(spacing: 24) {
                 // Column headers
                 HStack {
+                    Spacer()
                     Text("Mark wins point 👇")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.blue)
                         .frame(maxWidth: .infinity)
-
+                    Spacer()
                     Text("Jeff wins point 👇")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(.yellow)
                         .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 4)
 
                 // Row 1: Serve
-                HStack(alignment: .center, spacing: 16) {
-                    Text("Serve:")
-                        .font(.subheadline)
+                HStack(alignment: .center, spacing: 4) {
+                    Text("Serve")
+                        .font(.caption)
                         .fontWeight(.medium)
-                        .frame(width: 60, alignment: .leading)
+                        .frame(width: 30, alignment: .leading)
 
                     HStack(spacing: 16) {
                         if server.name == "Mark" {
-                            PointButton("🎾 Mark ace", color: .blue) {
+                            PointButton("🎾 Mark ace", color: Color(white: 0.3), height: 50) {
                                 onPointRecorded(match.playerOne, .ace)
                             }
                         } else {
                             // Jeff is serving, so Jeff double fault = Mark wins point (left column)
-                            PointButton("❌ Jeff double fault", color: .blue) {
+                            PointButton("❌ Double fault", color: Color(white: 0.3), height: 50) {
                                 onPointRecorded(match.playerTwo, .doubleFault)
                             }
                         }
 
                         if server.name == "Jeff" {
-                            PointButton("🎾 Jeff ace", color: .yellow) {
+                            PointButton("🎾 Jeff ace", color: .gray, height: 50) {
                                 onPointRecorded(match.playerTwo, .ace)
                             }
                         } else {
                             // Mark is serving, so Mark double fault = Jeff wins point (right column)
-                            PointButton("❌ Mark double fault", color: .yellow) {
+                            PointButton("❌ Double fault", color: .gray, height: 50) {
                                 onPointRecorded(match.playerOne, .doubleFault)
                             }
                         }
@@ -674,43 +693,44 @@ struct UnifiedButtonsView: View {
                 }
 
                 // Row 2: Rally
-                HStack(alignment: .center, spacing: 16) {
-                    Text("Rally:")
-                        .font(.subheadline)
+                HStack(alignment: .center, spacing: 4) {
+                    Text("Rally")
+                        .font(.caption)
                         .fontWeight(.medium)
-                        .frame(width: 60, alignment: .leading)
+                        .frame(width: 30, alignment: .leading)
 
-                    HStack(spacing: 16) {
-                        PointButton("🏆 Mark rally winner", color: .blue) {
+                    HStack(spacing: 20) {
+                        PointButton("🚀 Mark rally winner", color: Color(white: 0.3), height: 90) {
                             onPointRecorded(match.playerOne, .winner)
                         }
 
-                        PointButton("🏆 Jeff rally winner", color: .yellow) {
+                        PointButton("🚀 Jeff rally winner", color: .gray, height: 90) {
                             onPointRecorded(match.playerTwo, .winner)
                         }
                     }
                 }
 
                 // Row 3: Rally errors
-                HStack(alignment: .center, spacing: 16) {
+                HStack(alignment: .center, spacing: 4) {
                     Text("")
-                        .frame(width: 60)
+                        .frame(width: 30)
 
-                    HStack(spacing: 16) {
+                    HStack(spacing: 20) {
                         // Left column = Mark wins point = Jeff makes unforced error
-                        PointButton("🙈 Jeff unforced error", color: .blue) {
+                        PointButton("🙈 Jeff error", color: Color(white: 0.3), height: 100) {
                             onPointRecorded(match.playerTwo, .unforcedError)
                         }
 
                         // Right column = Jeff wins point = Mark makes unforced error
-                        PointButton("🙈 Mark unforced error", color: .yellow) {
+                        PointButton("🙈 Mark  error", color: .gray, height: 100) {
                             onPointRecorded(match.playerOne, .unforcedError)
                         }
                     }
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, 4)
+        .padding(.vertical)
     }
 }
 
@@ -761,14 +781,16 @@ struct PointButton: View {
     let color: Color
     let style: PointButtonStyle
     let disabled: Bool
+    let height: CGFloat
     let action: () -> Void
 
     @State private var isPressed = false
 
-    init(_ title: String, color: Color = .blue, style: PointButtonStyle = .prominent, disabled: Bool = false, action: @escaping () -> Void) {
+    init(_ title: String, color: Color = .blue, style: PointButtonStyle = .prominent, height: CGFloat = 50, disabled: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.color = color
         self.style = style
+        self.height = height
         self.disabled = disabled
         self.action = action
     }
@@ -778,11 +800,11 @@ struct PointButton: View {
             Text(title)
                 .font(.caption)
                 .fontWeight(.medium)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .foregroundStyle(color == .gray ? .black : .white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 8)
         }
+        .frame(height: height)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(disabled ? Color.gray.opacity(0.4) : (isPressed ? color.opacity(0.8) : color))
