@@ -46,62 +46,82 @@ struct ContentView: View {
     @State private var isProcessingPoint = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Top segmented control
-                Picker("", selection: $selectedTab) {
-                    ForEach(Tab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
+        TabView(selection: $selectedTab) {
+            // Play tab
+            NavigationStack {
+                if let match = activeMatch {
+                    PlayView(match: match, viewModel: matchViewModel, liveActivityManager: liveActivityManager)
+                } else if showingFirstServerSelection {
+                    FirstServerSelectionView(
+                        player1: matches.first?.playerOne ?? Player(name: "Mark"),
+                        player2: matches.first?.playerTwo ?? Player(name: "Jeff")
+                    ) {
+                        createNewMatch(firstServer: $0)
+                    }
+                } else {
+                    EmptyStateView(hasCompletedMatches: hasCompletedMatches) {
+                        // Always show first server selection for new matches
+                        showingFirstServerSelection = true
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding()
+            }
+            .tabItem {
+                Label("Play", systemImage: "tennisball.fill")
+            }
+            .tag(Tab.play)
 
-                // Main content area
-                VStack {
-                    switch selectedTab {
-                    case .play:
-                        if let match = activeMatch {
-                            PlayView(match: match, viewModel: matchViewModel, liveActivityManager: liveActivityManager)
-                        } else if showingFirstServerSelection {
-                            FirstServerSelectionView(
-                                player1: matches.first?.playerOne ?? Player(name: "Mark"),
-                                player2: matches.first?.playerTwo ?? Player(name: "Jeff")
-                            ) {
-                                createNewMatch(firstServer: $0)
-                            }
-                        } else {
-                            EmptyStateView(hasCompletedMatches: hasCompletedMatches) {
-                                // Always show first server selection for new matches
-                                showingFirstServerSelection = true
-                            }
-                        }
-                    case .view:
-                        StatsView(matches: matches, selectedMatch: $selectedMatch)
-                    case .settings:
-                        SettingsView()
-                            .environmentObject(liveActivityManager)
-                            .environmentObject(matchViewModel)
-                    }
+            // View tab
+            NavigationStack {
+                StatsView(matches: matches, selectedMatch: $selectedMatch)
+            }
+            .tabItem {
+                Label("View", systemImage: "chart.bar.fill")
+            }
+            .tag(Tab.view)
 
-                    Spacer()
-                }
-                .animation(.default, value: selectedTab)
+            // Settings tab
+            NavigationStack {
+                SettingsView()
+                    .environmentObject(liveActivityManager)
+                    .environmentObject(matchViewModel)
             }
-            .task {
-                ensureMatchSelection()
+            .tabItem {
+                Label("Settings", systemImage: "gear")
             }
-            .onChange(of: matches) {
-                ensureMatchSelection()
+            .tag(Tab.settings)
+        }
+        .onAppear {
+            // Make tab bar icons larger
+            let appearance = UITabBarAppearance()
+            appearance.configureWithDefaultBackground()
+
+            // Increase icon size
+            let itemAppearance = UITabBarItemAppearance()
+            itemAppearance.normal.iconColor = .systemGray
+            itemAppearance.selected.iconColor = .systemBlue
+
+            appearance.stackedLayoutAppearance = itemAppearance
+            appearance.inlineLayoutAppearance = itemAppearance
+            appearance.compactInlineLayoutAppearance = itemAppearance
+
+            UITabBar.appearance().standardAppearance = appearance
+            if #available(iOS 15.0, *) {
+                UITabBar.appearance().scrollEdgeAppearance = appearance
             }
-            .onChange(of: activeMatch) { oldValue, newValue in
-                if let match = newValue {
-                    matchViewModel.setMatch(match)
-                }
+        }
+        .task {
+            ensureMatchSelection()
+        }
+        .onChange(of: matches) {
+            ensureMatchSelection()
+        }
+        .onChange(of: activeMatch) { oldValue, newValue in
+            if let match = newValue {
+                matchViewModel.setMatch(match)
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
-                handleWidgetPointAction(notification)
-            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
+            handleWidgetPointAction(notification)
         }
     }
 
@@ -162,10 +182,10 @@ struct ContentView: View {
     }
 
     private func recordPoint(match: Match, player: Player, type: PointType) {
-        // Debounce rapid button presses
+        // Debounce rapid button presses (500ms = 0.5 seconds)
         let now = Date()
-        guard now.timeIntervalSince(lastPointTime) > 0.1 else {
-            print("⏭️ Ignoring rapid tap (debounce)")
+        guard now.timeIntervalSince(lastPointTime) > 0.5 else {
+            print("⏭️ Ignoring rapid tap (debounce - too fast, wait 500ms)")
             return
         }
         lastPointTime = now
@@ -374,58 +394,86 @@ struct FirstServerSelectionView: View {
     @State private var coinResult: Player?
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 32) {
             Text("Who serves first?")
-                .font(.title2)
+                .font(.title)
                 .fontWeight(.semibold)
 
-            VStack(spacing: 16) {
-                Button(player1.name) {
+            // Large left-right buttons for players
+            HStack(spacing: 16) {
+                Button(action: {
                     onPlayerSelected(player1)
+                }) {
+                    Text(player1.name)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .cornerRadius(16)
                 }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
 
-                Button(player2.name) {
+                Button(action: {
                     onPlayerSelected(player2)
+                }) {
+                    Text(player2.name)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundColor(.orange)
+                        .cornerRadius(16)
                 }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal)
 
+            // Toss button or result
+            if isFlipping {
+                Text("Tossing coin...")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            } else if let result = coinResult {
+                VStack(spacing: 12) {
+                    Text("\(result.name) won the toss")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(result.id == player1.id ? .blue : .orange)
+
+                    Text("\(result.name) decides")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .onAppear {
+                    // Add haptic feedback
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                }
+            } else {
                 Button(action: tossCoin) {
                     HStack {
                         CoinView(
                             player1: player1,
                             player2: player2,
-                            isFlipping: isFlipping,
-                            result: coinResult
+                            isFlipping: false,
+                            result: nil
                         )
                         Text("Toss for it")
+                            .font(.headline)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color(.systemGray5))
+                    .cornerRadius(12)
                 }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .disabled(isFlipping)
+                .buttonStyle(.plain)
+                .padding(.horizontal)
             }
 
-            if let result = coinResult, !isFlipping {
-                Text("🎾 \(result.name) serves first! 🎾")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.green)
-                    .scaleEffect(1.1)
-                    .animation(.easeOut(duration: 0.3), value: coinResult)
-                    .onAppear {
-                        // Add haptic feedback
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                        impactFeedback.impactOccurred()
-
-                        // Auto-select after longer delay for dramatic effect
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            onPlayerSelected(result)
-                        }
-                    }
-            }
+            Spacer()
         }
         .padding()
     }
@@ -438,7 +486,7 @@ struct FirstServerSelectionView: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
 
-        // Longer, more dramatic flip duration
+        // Coin flip duration
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             coinResult = Bool.random() ? player1 : player2
             isFlipping = false

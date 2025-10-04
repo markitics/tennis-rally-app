@@ -38,20 +38,20 @@ struct TennisMatchLiveActivity: Widget {
                         Text("-")
                             .font(.caption)
                         Text(context.state.inGameScoreP2)
-                            .font(.title2)
+                            .font(.title)
                             .fontWeight(.bold)
                     }
                 }
                 .frame(maxWidth: .infinity)
 
                 // COLUMN 2 (33%): Mark wins point
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     // Row 1: Serve outcome (conditional)
                     if context.state.serverName == "Mark" {
                         Button(intent: AceIntent()) {
                             Text("🎾 M ace")
                                 .font(.caption2)
-                                .frame(maxWidth: .infinity, minHeight: 24)
+                                .frame(maxWidth: .infinity, minHeight: 20)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
@@ -59,7 +59,7 @@ struct TennisMatchLiveActivity: Widget {
                         Button(intent: DoubleFaultIntent()) {
                             Text("❌ Dbl fault")
                                 .font(.caption2)
-                                .frame(maxWidth: .infinity, minHeight: 24)
+                                .frame(maxWidth: .infinity, minHeight: 20)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
@@ -71,7 +71,7 @@ struct TennisMatchLiveActivity: Widget {
                             Text("🏆").font(.title3)
                             Text("M Win").font(.caption2)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
@@ -82,7 +82,7 @@ struct TennisMatchLiveActivity: Widget {
                             Text("🙈").font(.title3)
                             Text("J Err").font(.caption2)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
@@ -96,7 +96,7 @@ struct TennisMatchLiveActivity: Widget {
                         Button(intent: AceIntent()) {
                             Text("🎾 J ace")
                                 .font(.caption2)
-                                .frame(maxWidth: .infinity, minHeight: 24)
+                                .frame(maxWidth: .infinity, minHeight: 20)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
@@ -104,7 +104,7 @@ struct TennisMatchLiveActivity: Widget {
                         Button(intent: DoubleFaultIntent()) {
                             Text("❌ Dbl fault")
                                 .font(.caption2)
-                                .frame(maxWidth: .infinity, minHeight: 24)
+                                .frame(maxWidth: .infinity, minHeight: 20)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
@@ -116,7 +116,7 @@ struct TennisMatchLiveActivity: Widget {
                             Text("🏆").font(.title3)
                             Text("J Win").font(.caption2)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
@@ -127,7 +127,7 @@ struct TennisMatchLiveActivity: Widget {
                             Text("🙈").font(.title3)
                             Text("M Err").font(.caption2)
                         }
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .frame(maxWidth: .infinity, minHeight: 30)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.green)

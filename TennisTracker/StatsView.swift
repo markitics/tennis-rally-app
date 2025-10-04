@@ -7,13 +7,14 @@
 
 import SwiftUI
 import SwiftData
+import Charts
 
 struct StatsView: View {
     let matches: [Match]
     @Binding var selectedMatch: Match?
 
     @Environment(\.modelContext) private var modelContext
-    @State private var selectedSet: Int? = nil
+    @State private var filterMode: FilterMode = .allSets
     @State private var showingDeleteAlert = false
     @State private var showingNoteEditor = false
 
@@ -34,34 +35,27 @@ struct StatsView: View {
                         // Set selector
                         SetSelectorView(
                             match: match,
-                            selectedSet: $selectedSet
+                            filterMode: $filterMode
                         )
 
-                        // Points Won chart
-                        PointsChartView(
-                            match: match,
-                            filteredPoints: selectedSet == nil ? match.sortedPoints : match.sortedPoints.filter { $0.setNumber == selectedSet }
-                        )
+                        switch filterMode {
+                        case .byGamePointsWon:
+                            // By-game: Points Won
+                            ByGamePointsWonView(match: match)
 
-                        // Points Played chart
-                        PointsPlayedChartView(
-                            match: match,
-                            filteredPoints: selectedSet == nil ? match.sortedPoints : match.sortedPoints.filter { $0.setNumber == selectedSet }
-                        )
+                        case .byGamePointsEnded:
+                            // By-game: Points Ended
+                            ByGamePointsEndedView(match: match)
 
-                        // Stats table
-                        StatsTableView(
-                            match: match,
-                            selectedSet: selectedSet
-                        )
-
-                        // Action buttons
-                        MatchActionButtonsView(
-                            match: match,
-                            onEndMatch: { endMatch(match) },
-                            onDeleteMatch: { showingDeleteAlert = true },
-                            onAddNote: { showingNoteEditor = true }
-                        )
+                        default:
+                            StatsContentView(
+                                match: match,
+                                filterMode: filterMode,
+                                onEndMatch: { endMatch(match) },
+                                onDeleteMatch: { showingDeleteAlert = true },
+                                onAddNote: { showingNoteEditor = true }
+                            )
+                        }
                     }
                 }
             }
@@ -144,47 +138,200 @@ struct MatchSelectorView: View {
     }
 }
 
-struct SetSelectorView: View {
-    let match: Match
-    @Binding var selectedSet: Int?
+enum FilterMode: Hashable {
+    case allSets
+    case bySet(Int)
+    case byGamePointsWon
+    case byGamePointsEnded
+}
 
-    private var setCount: Int {
-        ScoreEngine.currentSetNumber(
-            from: match.sortedPoints,
-            p1: match.playerOne.id,
-            p2: match.playerTwo.id
-        )
+enum ByGameMode: String, CaseIterable {
+    case pointsWon = "Points won"
+    case pointsEnded = "Points ended"
+}
+
+struct StatsContentView: View {
+    let match: Match
+    let filterMode: FilterMode
+    let onEndMatch: () -> Void
+    let onDeleteMatch: () -> Void
+    let onAddNote: () -> Void
+
+    private var filteredPoints: [Point] {
+        switch filterMode {
+        case .allSets:
+            return match.sortedPoints
+        case .bySet(let setNumber):
+            return match.sortedPoints.filter { $0.setNumber == setNumber }
+        case .byGamePointsWon, .byGamePointsEnded:
+            return []
+        }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Set Filter")
+        VStack(alignment: .leading, spacing: 16) {
+            // Points Won chart
+            PointsChartView(
+                match: match,
+                filteredPoints: filteredPoints
+            )
+
+            // Points Played chart
+            PointsPlayedChartView(
+                match: match,
+                filteredPoints: filteredPoints
+            )
+
+            // Stats table
+            StatsTableView(
+                match: match,
+                filterMode: filterMode
+            )
+
+            // Action buttons
+            MatchActionButtonsView(
+                match: match,
+                onEndMatch: onEndMatch,
+                onDeleteMatch: onDeleteMatch,
+                onAddNote: onAddNote
+            )
+        }
+    }
+}
+
+struct SetSelectorView: View {
+    let match: Match
+    @Binding var filterMode: FilterMode
+
+    @State private var selectedBySetOption: Int = 1
+    @State private var selectedByGameOption: ByGameMode = .pointsEnded
+
+    private var setsWithPoints: [Int] {
+        let uniqueSets = Set(match.sortedPoints.map { $0.setNumber })
+        return uniqueSets.sorted()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("View")
                 .font(.headline)
 
-            Picker("Set", selection: $selectedSet) {
-                Text("All Sets").tag(nil as Int?)
-                ForEach(1...setCount, id: \.self) { setNumber in
-                    Text("Set \(setNumber)").tag(Optional(setNumber))
+            HStack(spacing: 12) {
+                // All Sets button
+                Button(action: {
+                    filterMode = .allSets
+                }) {
+                    Text("All sets")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(filterMode == .allSets ? Color.accentColor : Color.clear)
+                        .foregroundColor(filterMode == .allSets ? .white : .primary)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.accentColor, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                // By Set dropdown
+                Menu {
+                    ForEach(setsWithPoints, id: \.self) { setNumber in
+                        Button("Set \(setNumber)") {
+                            selectedBySetOption = setNumber
+                            filterMode = .bySet(setNumber)
+                        }
+                    }
+                } label: {
+                    let isSelected: Bool = {
+                        if case .bySet = filterMode { return true }
+                        return false
+                    }()
+
+                    HStack {
+                        Text("By set")
+                        if case .bySet(let setNumber) = filterMode {
+                            Text("(\(setNumber))")
+                                .foregroundColor(.secondary)
+                        }
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(isSelected ? Color.accentColor : Color.clear)
+                    .foregroundColor(isSelected ? .white : .primary)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.accentColor, lineWidth: 1)
+                    )
+                }
+
+                // By Game dropdown
+                Menu {
+                    ForEach(ByGameMode.allCases, id: \.self) { mode in
+                        Button(mode.rawValue) {
+                            selectedByGameOption = mode
+                            switch mode {
+                            case .pointsWon:
+                                filterMode = .byGamePointsWon
+                            case .pointsEnded:
+                                filterMode = .byGamePointsEnded
+                            }
+                        }
+                    }
+                } label: {
+                    let isSelected: Bool = {
+                        if case .byGamePointsWon = filterMode { return true }
+                        if case .byGamePointsEnded = filterMode { return true }
+                        return false
+                    }()
+
+                    HStack {
+                        Text("By game")
+                        if case .byGamePointsWon = filterMode {
+                            Text("(Won)")
+                                .foregroundColor(.secondary)
+                        } else if case .byGamePointsEnded = filterMode {
+                            Text("(Ended)")
+                                .foregroundColor(.secondary)
+                        }
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(isSelected ? Color.accentColor : Color.clear)
+                    .foregroundColor(isSelected ? .white : .primary)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.accentColor, lineWidth: 1)
+                    )
                 }
             }
-            .pickerStyle(.segmented)
         }
     }
 }
 
 struct StatsTableView: View {
     let match: Match
-    let selectedSet: Int?
+    let filterMode: FilterMode
 
     private var filteredPoints: [Point] {
-        if let set = selectedSet {
-            return match.sortedPoints.filter { $0.setNumber == set }
+        switch filterMode {
+        case .allSets:
+            return match.sortedPoints
+        case .bySet(let setNumber):
+            return match.sortedPoints.filter { $0.setNumber == setNumber }
+        case .byGamePointsWon, .byGamePointsEnded:
+            return []
         }
-        return match.sortedPoints
     }
 
     private var finalScoreWithWinner: (winner: String?, score: String) {
-        if let setNumber = selectedSet {
+        if case .bySet(let setNumber) = filterMode {
             // Show individual set score with winner first
             let setPoints = match.sortedPoints.filter { $0.setNumber == setNumber }
             let derivedState = ScoreEngine.compute(
@@ -257,20 +404,20 @@ struct StatsTableView: View {
                     .fontWeight(.semibold)
             }
 
-            // Stats for each player
-            VStack(spacing: 12) {
-                PlayerStatsView(
-                    player: match.playerOne,
-                    points: filteredPoints
-                )
-
-                Divider()
-
-                PlayerStatsView(
-                    player: match.playerTwo,
-                    points: filteredPoints
-                )
-            }
+//            // Stats for each player -- commented out because we have the charts above
+//            VStack(spacing: 12) {
+//                PlayerStatsView(
+//                    player: match.playerOne,
+//                    points: filteredPoints
+//                )
+//
+//                Divider()
+//
+//                PlayerStatsView(
+//                    player: match.playerTwo,
+//                    points: filteredPoints
+//                )
+//            }
         }
     }
 }
@@ -333,12 +480,37 @@ struct MatchActionButtonsView: View {
                 .foregroundStyle(.red)
                 .frame(maxWidth: .infinity)
             } else {
-                HStack(spacing: 16) {
-                    Button(match.notes?.isEmpty == false ? "Edit Note" : "Add Note") {
-                        onAddNote()
+                // Display note if it exists (tappable to edit)
+                if let notes = match.notes, !notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Match Notes")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+
+                        Button(action: onAddNote) {
+                            Text(notes)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 8)
+                }
+
+                HStack(spacing: 16) {
+                    // Only show "Add Note" button if no note exists
+                    if match.notes?.isEmpty != false {
+                        Button("Add Note") {
+                            onAddNote()
+                        }
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
+                    }
 
                     Button("Delete Match") {
                         onDeleteMatch()
@@ -350,6 +522,7 @@ struct MatchActionButtonsView: View {
             }
         }
         .padding(.top)
+        .padding(.bottom, 24) // Extra whitespace above tab bar
     }
 }
 
@@ -706,6 +879,311 @@ struct HorizontalPlayerPlayedBarView: View {
             .frame(height: 24)
             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
+        }
+    }
+}
+
+// MARK: - By Game: Points Won (pyramid chart)
+struct ByGamePointsWonView: View {
+    let match: Match
+
+    struct GameData: Identifiable {
+        let id: String
+        let setNumber: Int
+        let gameNumber: Int
+        let p1Aces: Int
+        let p1Winners: Int
+        let p1OpponentErrors: Int  // Points won from opponent's errors
+        let p2Aces: Int
+        let p2Winners: Int
+        let p2OpponentErrors: Int
+
+        var label: String {
+            "S\(setNumber)G\(gameNumber)"
+        }
+    }
+
+    private var gameDataList: [GameData] {
+        let groupedPoints = Dictionary(grouping: match.sortedPoints) { point in
+            "\(point.setNumber)-\(point.gameNumber)"
+        }
+
+        var games: [GameData] = []
+        for (key, points) in groupedPoints.sorted(by: { $0.key < $1.key }) {
+            guard let firstPoint = points.first else { continue }
+
+            let p1WonPoints = points.filter { $0.winner.id == match.playerOne.id }
+            let p2WonPoints = points.filter { $0.winner.id == match.playerTwo.id }
+
+            games.append(GameData(
+                id: key,
+                setNumber: firstPoint.setNumber,
+                gameNumber: firstPoint.gameNumber,
+                p1Aces: p1WonPoints.filter { $0.type == .ace }.count,
+                p1Winners: p1WonPoints.filter { $0.type == .winner }.count,
+                p1OpponentErrors: p1WonPoints.filter { $0.type == .doubleFault || $0.type == .unforcedError }.count,
+                p2Aces: p2WonPoints.filter { $0.type == .ace }.count,
+                p2Winners: p2WonPoints.filter { $0.type == .winner }.count,
+                p2OpponentErrors: p2WonPoints.filter { $0.type == .doubleFault || $0.type == .unforcedError }.count
+            ))
+        }
+
+        return games.sorted { game1, game2 in
+            if game1.setNumber != game2.setNumber {
+                return game1.setNumber < game2.setNumber
+            }
+            return game1.gameNumber < game2.gameNumber
+        }
+    }
+
+    struct ChartPoint: Identifiable {
+        let id = UUID()
+        let game: String
+        let type: String
+        let value: Int
+        let color: Color
+    }
+
+    private var chartPoints: [ChartPoint] {
+        var points: [ChartPoint] = []
+
+        for game in gameDataList {
+            // Player 1 (Mark) on the left (negative values)
+            points.append(ChartPoint(game: game.label, type: "P1OppErr", value: -game.p1OpponentErrors, color: .pink))
+            points.append(ChartPoint(game: game.label, type: "P1W", value: -game.p1Winners, color: .green))
+            points.append(ChartPoint(game: game.label, type: "P1A", value: -game.p1Aces, color: .yellow))
+
+            // Player 2 (Jeff) on the right (positive values)
+            points.append(ChartPoint(game: game.label, type: "P2OppErr", value: game.p2OpponentErrors, color: .pink))
+            points.append(ChartPoint(game: game.label, type: "P2W", value: game.p2Winners, color: .green))
+            points.append(ChartPoint(game: game.label, type: "P2A", value: game.p2Aces, color: .yellow))
+        }
+
+        return points
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Points won per game")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                // Legend
+                HStack(spacing: 12) {
+                    Text(match.playerOne.name)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                    Text("←")
+                    Spacer()
+                    Text("→")
+                    Text(match.playerTwo.name)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal)
+
+                HStack(spacing: 12) {
+                    LegendItem(color: .yellow, text: "Aces")
+                    LegendItem(color: .green, text: "Winners")
+                    LegendItem(color: .pink, text: "Opp. Errors")
+                }
+                .padding(.horizontal)
+                .font(.caption)
+
+                // Population pyramid chart
+                Chart {
+                    ForEach(chartPoints) { point in
+                        BarMark(
+                            x: .value("Count", point.value),
+                            y: .value("Game", point.game)
+                        )
+                        .foregroundStyle(point.color)
+                    }
+                }
+                .chartXScale(domain: .automatic(includesZero: true))
+                .chartXAxis {
+                    AxisMarks(position: .bottom, values: [0]) { value in
+                        AxisValueLabel {
+                            Text("")
+                        }
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
+                    }
+                }
+                .frame(height: max(CGFloat(gameDataList.count) * 30, 200))
+                .padding(.horizontal)
+            }
+            .padding(.vertical)
+        }
+    }
+}
+
+// MARK: - By Game: Points Ended (pyramid chart - same as pyramid view)
+struct ByGamePointsEndedView: View {
+    let match: Match
+
+    struct GameData: Identifiable {
+        let id: String
+        let setNumber: Int
+        let gameNumber: Int
+        let p1Aces: Int
+        let p1Winners: Int
+        let p1DoubleFaults: Int
+        let p1UnforcedErrors: Int
+        let p2Aces: Int
+        let p2Winners: Int
+        let p2DoubleFaults: Int
+        let p2UnforcedErrors: Int
+
+        var label: String {
+            "S\(setNumber)G\(gameNumber)"
+        }
+    }
+
+    private var gameDataList: [GameData] {
+        let groupedPoints = Dictionary(grouping: match.sortedPoints) { point in
+            "\(point.setNumber)-\(point.gameNumber)"
+        }
+
+        var games: [GameData] = []
+        for (key, points) in groupedPoints.sorted(by: { $0.key < $1.key }) {
+            guard let firstPoint = points.first else { continue }
+
+            let p1EndedPoints = points.filter { point in
+                if point.winner.id == match.playerOne.id { return true }
+                if point.loser.id == match.playerOne.id && (point.type == .doubleFault || point.type == .unforcedError) { return true }
+                return false
+            }
+
+            let p2EndedPoints = points.filter { point in
+                if point.winner.id == match.playerTwo.id { return true }
+                if point.loser.id == match.playerTwo.id && (point.type == .doubleFault || point.type == .unforcedError) { return true }
+                return false
+            }
+
+            games.append(GameData(
+                id: key,
+                setNumber: firstPoint.setNumber,
+                gameNumber: firstPoint.gameNumber,
+                p1Aces: p1EndedPoints.filter { $0.type == .ace && $0.winner.id == match.playerOne.id }.count,
+                p1Winners: p1EndedPoints.filter { $0.type == .winner && $0.winner.id == match.playerOne.id }.count,
+                p1DoubleFaults: p1EndedPoints.filter { $0.type == .doubleFault && $0.loser.id == match.playerOne.id }.count,
+                p1UnforcedErrors: p1EndedPoints.filter { $0.type == .unforcedError && $0.loser.id == match.playerOne.id }.count,
+                p2Aces: p2EndedPoints.filter { $0.type == .ace && $0.winner.id == match.playerTwo.id }.count,
+                p2Winners: p2EndedPoints.filter { $0.type == .winner && $0.winner.id == match.playerTwo.id }.count,
+                p2DoubleFaults: p2EndedPoints.filter { $0.type == .doubleFault && $0.loser.id == match.playerTwo.id }.count,
+                p2UnforcedErrors: p2EndedPoints.filter { $0.type == .unforcedError && $0.loser.id == match.playerTwo.id }.count
+            ))
+        }
+
+        return games.sorted { game1, game2 in
+            if game1.setNumber != game2.setNumber {
+                return game1.setNumber < game2.setNumber
+            }
+            return game1.gameNumber < game2.gameNumber
+        }
+    }
+
+    struct ChartPoint: Identifiable {
+        let id = UUID()
+        let game: String
+        let type: String
+        let value: Int
+        let color: Color
+    }
+
+    private var chartPoints: [ChartPoint] {
+        var points: [ChartPoint] = []
+
+        for game in gameDataList {
+            // Player 1 (Mark) on the left (negative values)
+            points.append(ChartPoint(game: game.label, type: "P1UE", value: -game.p1UnforcedErrors, color: .pink))
+            points.append(ChartPoint(game: game.label, type: "P1DF", value: -game.p1DoubleFaults, color: .red))
+            points.append(ChartPoint(game: game.label, type: "P1W", value: -game.p1Winners, color: .green))
+            points.append(ChartPoint(game: game.label, type: "P1A", value: -game.p1Aces, color: .yellow))
+
+            // Player 2 (Jeff) on the right (positive values)
+            points.append(ChartPoint(game: game.label, type: "P2UE", value: game.p2UnforcedErrors, color: .pink))
+            points.append(ChartPoint(game: game.label, type: "P2DF", value: game.p2DoubleFaults, color: .red))
+            points.append(ChartPoint(game: game.label, type: "P2W", value: game.p2Winners, color: .green))
+            points.append(ChartPoint(game: game.label, type: "P2A", value: game.p2Aces, color: .yellow))
+        }
+
+        return points
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Points ended per game")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                // Legend
+                HStack(spacing: 12) {
+                    Text(match.playerOne.name)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                    Text("←")
+                    Spacer()
+                    Text("→")
+                    Text(match.playerTwo.name)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal)
+
+                HStack(spacing: 12) {
+                    LegendItem(color: .yellow, text: "Aces")
+                    LegendItem(color: .green, text: "Winners")
+                    LegendItem(color: .red, text: "DF")
+                    LegendItem(color: .pink, text: "UE")
+                }
+                .padding(.horizontal)
+                .font(.caption)
+
+                // Population pyramid chart
+                Chart {
+                    ForEach(chartPoints) { point in
+                        BarMark(
+                            x: .value("Count", point.value),
+                            y: .value("Game", point.game)
+                        )
+                        .foregroundStyle(point.color)
+                    }
+                }
+                .chartXScale(domain: .automatic(includesZero: true))
+                .chartXAxis {
+                    AxisMarks(position: .bottom, values: [0]) { value in
+                        AxisValueLabel {
+                            Text("")
+                        }
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
+                    }
+                }
+                .frame(height: max(CGFloat(gameDataList.count) * 30, 200))
+                .padding(.horizontal)
+            }
+            .padding(.vertical)
+        }
+    }
+}
+
+struct LegendItem: View {
+    let color: Color
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Rectangle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+                .cornerRadius(2)
+            Text(text)
         }
     }
 }
