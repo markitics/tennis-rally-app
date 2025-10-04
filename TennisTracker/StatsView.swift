@@ -1135,6 +1135,7 @@ struct ByGamePointsWonView: View {
 
         var games: [GameData] = []
         var currentSetNumber = 0
+        var gameNumberInSet = 0  // Calculate game number instead of using stored value
         var p1GamesWon = 0
         var p2GamesWon = 0
 
@@ -1144,9 +1145,12 @@ struct ByGamePointsWonView: View {
             // Reset game count when entering new set
             if firstPoint.setNumber != currentSetNumber {
                 currentSetNumber = firstPoint.setNumber
+                gameNumberInSet = 0  // Reset for new set
                 p1GamesWon = 0
                 p2GamesWon = 0
             }
+
+            gameNumberInSet += 1  // Increment for each game
 
             let p1WonPoints = points.filter { $0.winner.id == match.playerOne.id }
             let p2WonPoints = points.filter { $0.winner.id == match.playerTwo.id }
@@ -1161,7 +1165,7 @@ struct ByGamePointsWonView: View {
             games.append(GameData(
                 id: key,
                 setNumber: firstPoint.setNumber,
-                gameNumber: firstPoint.gameNumber,
+                gameNumber: gameNumberInSet,  // Use calculated value
                 p1Aces: p1WonPoints.filter { $0.type == .ace }.count,
                 p1Winners: p1WonPoints.filter { $0.type == .winner }.count,
                 p1OpponentDoubleFaults: p1WonPoints.filter { $0.type == .doubleFault }.count,
@@ -1247,37 +1251,48 @@ struct ByGamePointsWonView: View {
                 .padding(.horizontal)
                 .font(.caption)
 
-                // Population pyramid chart
-                Chart {
-                    ForEach(chartPoints) { point in
-                        BarMark(
-                            x: .value("Count", point.value),
-                            y: .value("Game", point.game)
-                        )
-                        .foregroundStyle(point.color)
-                    }
-                }
-                .chartXScale(domain: -maxValue...maxValue)
-                .chartXAxis {
-                    AxisMarks(position: .bottom, values: [0]) { value in
-                        AxisValueLabel {
-                            Text("")
+                // Population pyramid chart with overlaid labels
+                ZStack(alignment: .leading) {
+                    Chart {
+                        ForEach(chartPoints) { point in
+                            BarMark(
+                                x: .value("Count", point.value),
+                                y: .value("Game", point.game)
+                            )
+                            .foregroundStyle(point.color)
                         }
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
                     }
-                }
-                .chartYAxis {
-                    AxisMarks { value in
-                        AxisValueLabel(anchor: .leading) {
-                            if let game = value.as(String.self) {
-                                Text(game)
-                                    .foregroundColor(.white)
-                                    .font(.caption2)
+                    .chartXScale(domain: -maxValue...maxValue)
+                    .chartXAxis {
+                        AxisMarks(position: .bottom, values: [0]) { value in
+                            AxisValueLabel {
+                                Text("")
                             }
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
                         }
                     }
+                    .chartYAxis(.hidden)
+                    .frame(height: max(CGFloat(gameDataList.count) * 18, 200))
+
+                    // Game labels (left) and scores (right) overlay
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(gameDataList) { game in
+                            HStack {
+                                Text(game.label)
+                                    .foregroundColor(.primary)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Text(game.gameScore)
+                                    .foregroundColor(.primary)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                            }
+                            .frame(height: 18)
+                        }
+                    }
+                    .padding(.horizontal, 8)
                 }
-                .frame(height: max(CGFloat(gameDataList.count) * 18, 200))
                 .padding(.horizontal)
             }
             .padding(.vertical)
@@ -1301,6 +1316,7 @@ struct ByGamePointsEndedView: View {
         let p2Winners: Int
         let p2DoubleFaults: Int
         let p2UnforcedErrors: Int
+        let gameScore: String
 
         var label: String {
             "S\(setNumber)G\(gameNumber)"
@@ -1313,8 +1329,23 @@ struct ByGamePointsEndedView: View {
         }
 
         var games: [GameData] = []
+        var currentSetNumber = 0
+        var gameNumberInSet = 0  // Calculate game number instead of using stored value
+        var p1GamesWon = 0
+        var p2GamesWon = 0
+
         for (key, points) in groupedPoints.sorted(by: { $0.key < $1.key }) {
             guard let firstPoint = points.first else { continue }
+
+            // Reset game count when entering new set
+            if firstPoint.setNumber != currentSetNumber {
+                currentSetNumber = firstPoint.setNumber
+                gameNumberInSet = 0  // Reset for new set
+                p1GamesWon = 0
+                p2GamesWon = 0
+            }
+
+            gameNumberInSet += 1  // Increment for each game
 
             let p1EndedPoints = points.filter { point in
                 if point.winner.id == match.playerOne.id { return true }
@@ -1328,10 +1359,19 @@ struct ByGamePointsEndedView: View {
                 return false
             }
 
+            // Determine game winner (who scored more points)
+            let p1WonPoints = points.filter { $0.winner.id == match.playerOne.id }
+            let p2WonPoints = points.filter { $0.winner.id == match.playerTwo.id }
+            if p1WonPoints.count > p2WonPoints.count {
+                p1GamesWon += 1
+            } else {
+                p2GamesWon += 1
+            }
+
             games.append(GameData(
                 id: key,
                 setNumber: firstPoint.setNumber,
-                gameNumber: firstPoint.gameNumber,
+                gameNumber: gameNumberInSet,  // Use calculated value
                 p1Aces: p1EndedPoints.filter { $0.type == .ace && $0.winner.id == match.playerOne.id }.count,
                 p1Winners: p1EndedPoints.filter { $0.type == .winner && $0.winner.id == match.playerOne.id }.count,
                 p1DoubleFaults: p1EndedPoints.filter { $0.type == .doubleFault && $0.loser.id == match.playerOne.id }.count,
@@ -1339,7 +1379,8 @@ struct ByGamePointsEndedView: View {
                 p2Aces: p2EndedPoints.filter { $0.type == .ace && $0.winner.id == match.playerTwo.id }.count,
                 p2Winners: p2EndedPoints.filter { $0.type == .winner && $0.winner.id == match.playerTwo.id }.count,
                 p2DoubleFaults: p2EndedPoints.filter { $0.type == .doubleFault && $0.loser.id == match.playerTwo.id }.count,
-                p2UnforcedErrors: p2EndedPoints.filter { $0.type == .unforcedError && $0.loser.id == match.playerTwo.id }.count
+                p2UnforcedErrors: p2EndedPoints.filter { $0.type == .unforcedError && $0.loser.id == match.playerTwo.id }.count,
+                gameScore: "\(p1GamesWon)-\(p2GamesWon)"
             ))
         }
 
@@ -1416,37 +1457,48 @@ struct ByGamePointsEndedView: View {
                 .padding(.horizontal)
                 .font(.caption)
 
-                // Population pyramid chart
-                Chart {
-                    ForEach(chartPoints) { point in
-                        BarMark(
-                            x: .value("Count", point.value),
-                            y: .value("Game", point.game)
-                        )
-                        .foregroundStyle(point.color)
-                    }
-                }
-                .chartXScale(domain: -maxValue...maxValue)
-                .chartXAxis {
-                    AxisMarks(position: .bottom, values: [0]) { value in
-                        AxisValueLabel {
-                            Text("")
+                // Population pyramid chart with overlaid labels
+                ZStack(alignment: .leading) {
+                    Chart {
+                        ForEach(chartPoints) { point in
+                            BarMark(
+                                x: .value("Count", point.value),
+                                y: .value("Game", point.game)
+                            )
+                            .foregroundStyle(point.color)
                         }
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
                     }
-                }
-                .chartYAxis {
-                    AxisMarks { value in
-                        AxisValueLabel(anchor: .leading) {
-                            if let game = value.as(String.self) {
-                                Text(game)
-                                    .foregroundColor(.white)
-                                    .font(.caption2)
+                    .chartXScale(domain: -maxValue...maxValue)
+                    .chartXAxis {
+                        AxisMarks(position: .bottom, values: [0]) { value in
+                            AxisValueLabel {
+                                Text("")
                             }
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 2))
                         }
                     }
+                    .chartYAxis(.hidden)
+                    .frame(height: max(CGFloat(gameDataList.count) * 18, 200))
+
+                    // Game labels (left) and scores (right) overlay
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(gameDataList) { game in
+                            HStack {
+                                Text(game.label)
+                                    .foregroundColor(.primary)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Text(game.gameScore)
+                                    .foregroundColor(.primary)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                            }
+                            .frame(height: 18)
+                        }
+                    }
+                    .padding(.horizontal, 8)
                 }
-                .frame(height: max(CGFloat(gameDataList.count) * 18, 200))
                 .padding(.horizontal)
             }
             .padding(.vertical)
