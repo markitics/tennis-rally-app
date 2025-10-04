@@ -226,42 +226,45 @@ struct TimelineNavigationView: View {
     @State private var forwardPressed = false
 
     var body: some View {
-        HStack(spacing: 20) {
-            Button(action: animatedBack) {
-                Label("Back", systemImage: "arrow.left")
-            }
-            .buttonStyle(.bordered)
-            .disabled(!viewModel.canBack)
-            .scaleEffect(backPressed ? 0.95 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: backPressed)
+        VStack(spacing: 12) {
+            // Navigation buttons row
+            HStack(spacing: 20) {
+                Button(action: animatedBack) {
+                    Label("Back", systemImage: "arrow.left")
+                }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canBack)
+                .scaleEffect(backPressed ? 0.95 : 1.0)
+                .animation(.easeInOut(duration: 0.1), value: backPressed)
 
-            VStack(spacing: 2) {
-                Text("\(viewModel.cursor)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+                VStack(spacing: 2) {
+                    Text("\(viewModel.cursor)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
 
-                // Debug indicator - only show bug if cursor is out of sync AND we're not intentionally navigating
-                if let match = viewModel.match,
-                   viewModel.cursor != match.sortedPoints.count &&
-                   !viewModel.canForward {
-                    Text("🐛")
-                        .font(.caption2)
+                    // Debug indicator - only show bug if cursor is out of sync AND we're not intentionally navigating
+                    if let match = viewModel.match,
+                       viewModel.cursor != match.sortedPoints.count &&
+                       !viewModel.canForward {
+                        Text("🐛")
+                            .font(.caption2)
+                    }
                 }
 
-                // Show up to last 50 button presses for debugging
-                if let match = viewModel.match {
-                    GameProgressionView(match: match)
+                Button(action: animatedForward) {
+                    Label("Forward", systemImage: "arrow.right")
                 }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.canForward)
+                .scaleEffect(forwardPressed ? 0.95 : 1.0)
+                .animation(.easeInOut(duration: 0.1), value: forwardPressed)
             }
 
-            Button(action: animatedForward) {
-                Label("Forward", systemImage: "arrow.right")
+            // Progression text below (no truncation)
+            if let match = viewModel.match {
+                GameProgressionView(match: match, viewModel: viewModel)
             }
-            .buttonStyle(.bordered)
-            .disabled(!viewModel.canForward)
-            .scaleEffect(forwardPressed ? 0.95 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: forwardPressed)
         }
     }
 
@@ -366,6 +369,9 @@ struct PointInputView: View {
 
         // Play speech (if enabled)
         if soundEnabled {
+            // Stop any current speech to prevent queueing
+            speechSynthesizer.stopSpeaking(at: .immediate)
+
             let utterance = AVSpeechUtterance(string: speechPhrase)
             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
             utterance.rate = 0.5 // Slightly faster than default
@@ -424,20 +430,35 @@ struct PointInputView: View {
             p2: match.playerTwo.id
         )
 
+        let gameNumber = ScoreEngine.currentGameNumber(
+            from: Array(match.sortedPoints.prefix(viewModel.cursor)),
+            p1: match.playerOne.id,
+            p2: match.playerTwo.id
+        )
+
         let newPoint = Point(
             match: match,
             winner: winner,
             loser: loser,
             type: type,
-            setNumber: setNumber
+            setNumber: setNumber,
+            gameNumber: gameNumber
         )
 
         // Store old points for tiebreak detection
         let oldPoints = match.sortedPoints
 
         // Add point using proper SwiftData relationship
+        let insertStart = Date()
+        print("💾 [BEFORE INSERT] About to insert point - total points before: \(match.sortedPoints.count)")
+
         modelContext.insert(newPoint)
+
+        let insertElapsed = Date().timeIntervalSince(insertStart) * 1000
+        print("💾 [AFTER INSERT] Insert took \(insertElapsed)ms - total points after: \(match.sortedPoints.count)")
+
         viewModel.cursor = match.sortedPoints.count
+        print("💾 [CURSOR UPDATE] Cursor set to \(viewModel.cursor)")
 
         // Check if we just started a new tiebreak and update tiebreak first servers
         let updatedTiebreakFirstServers = ScoreEngine.checkForTiebreakStart(
@@ -659,7 +680,6 @@ struct UnifiedButtonsView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 4)
-
                 // Row 1: Serve
                 HStack(alignment: .center, spacing: 4) {
                     Text("Serve")
@@ -830,6 +850,12 @@ struct PointButton: View {
 
 struct GameProgressionView: View {
     let match: Match
+    @ObservedObject var viewModel: MatchViewModel
+
+    // Use visible points based on cursor, not all match points
+    private var visiblePoints: [Point] {
+        Array(match.sortedPoints.prefix(viewModel.cursor))
+    }
 
     private func pointsToTennisScore(_ p1Points: Int, _ p2Points: Int) -> (String, String) {
         // Handle deuce scenarios
@@ -869,77 +895,38 @@ struct GameProgressionView: View {
         }
     }
 
-    // Find the points for the current game
+    // Find the points for the current game (using visible points from cursor)
     private var currentGamePoints: [Point] {
-        guard !match.sortedPoints.isEmpty else { return [] }
+        let startTime = Date()
+        guard !visiblePoints.isEmpty else { return [] }
 
-        // Split points into games by walking forward and detecting game boundaries
-        var allGames: [[Point]] = []
-        var currentGame: [Point] = []
-        var p1GameScore = 0
-        var p2GameScore = 0
+        // Just use the gameNumber from the last visible point - it's already stored!
+        let currentGameNumber = visiblePoints.last?.gameNumber ?? 1
 
-        for point in match.sortedPoints {
-            currentGame.append(point)
+        let result = visiblePoints.filter { $0.gameNumber == currentGameNumber }
 
-            // Count points in current game
-            if point.winner.id == match.playerOne.id {
-                p1GameScore += 1
-            } else {
-                p2GameScore += 1
-            }
+        let elapsed = Date().timeIntervalSince(startTime) * 1000
+        print("⏱️ currentGamePoints: \(elapsed)ms - found \(result.count) points for game \(currentGameNumber) out of \(visiblePoints.count) visible")
 
-            // Check if game is won
-            let gameWon = (p1GameScore >= 4 || p2GameScore >= 4) && abs(p1GameScore - p2GameScore) >= 2
-            if gameWon {
-                // Game complete, save it and start new game
-                allGames.append(currentGame)
-                currentGame = []
-                p1GameScore = 0
-                p2GameScore = 0
-            }
-        }
-
-        // Return the current incomplete game (if any points exist)
-        return currentGame
+        return result
     }
 
-    // Find the points for the last completed game
+    // Find the points for the last completed game (using visible points from cursor)
     private var lastCompletedGamePoints: [Point] {
-        guard !match.sortedPoints.isEmpty else { return [] }
+        guard !visiblePoints.isEmpty else { return [] }
 
-        // Split points into games by walking forward and detecting game boundaries
-        var allGames: [[Point]] = []
-        var currentGame: [Point] = []
-        var p1GameScore = 0
-        var p2GameScore = 0
+        // Just use the gameNumber from the last visible point - it's already stored!
+        let currentGameNumber = visiblePoints.last?.gameNumber ?? 1
 
-        for point in match.sortedPoints {
-            currentGame.append(point)
+        // Last completed game is currentGameNumber - 1
+        let lastGameNumber = currentGameNumber - 1
+        guard lastGameNumber >= 1 else { return [] }
 
-            // Count points in current game
-            if point.winner.id == match.playerOne.id {
-                p1GameScore += 1
-            } else {
-                p2GameScore += 1
-            }
-
-            // Check if game is won
-            let gameWon = (p1GameScore >= 4 || p2GameScore >= 4) && abs(p1GameScore - p2GameScore) >= 2
-            if gameWon {
-                // Game complete, save it and start new game
-                allGames.append(currentGame)
-                currentGame = []
-                p1GameScore = 0
-                p2GameScore = 0
-            }
-        }
-
-        // Return the last completed game (if any)
-        return allGames.last ?? []
+        return visiblePoints.filter { $0.gameNumber == lastGameNumber }
     }
 
     private func buildProgression(from points: [Point]) -> String {
+        let startTime = Date()
         guard !points.isEmpty else { return "" }
 
         var progression = "0-0"
@@ -967,6 +954,9 @@ struct GameProgressionView: View {
             }
         }
 
+        let elapsed = Date().timeIntervalSince(startTime) * 1000
+        print("⏱️ buildProgression: \(elapsed)ms - built string from \(points.count) points")
+
         return progression
     }
 
@@ -981,39 +971,51 @@ struct GameProgressionView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 4) {
-                if match.sortedPoints.isEmpty {
-                    Text("Match just started")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else if isCurrentScoreZeroZero && !isFirstGameOfMatch {
-                    // Show last completed game
-                    Text("Last game finished:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(buildProgression(from: lastCompletedGamePoints))
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .lineLimit(3)
-                } else if !currentGamePoints.isEmpty {
-                    // Show current game in progress
-                    Text("Recent progression:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(buildProgression(from: currentGamePoints))
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .lineLimit(3)
-                } else {
-                    // First game at 0-0
-                    Text("Ready to start first game")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+        let renderStart = Date()
+        print("⏱️ GameProgressionView.body START - render #\(Int.random(in: 1000...9999)) - cursor: \(viewModel.cursor), visible: \(visiblePoints.count)")
+
+        return VStack(alignment: .leading, spacing: 4) {
+            if visiblePoints.isEmpty {
+                Text("Match just started")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else if isCurrentScoreZeroZero && !isFirstGameOfMatch {
+                // Show last completed game
+                Text("Last game finished:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(buildProgression(from: lastCompletedGamePoints))
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .onAppear {
+                        let elapsed = Date().timeIntervalSince(renderStart) * 1000
+                        print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
+                    }
+            } else if !currentGamePoints.isEmpty {
+                // Show current game in progress
+                Text("Recent progression:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(buildProgression(from: currentGamePoints))
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .onAppear {
+                        let elapsed = Date().timeIntervalSince(renderStart) * 1000
+                        print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
+                    }
+            } else {
+                // First game at 0-0
+                Text("Ready to start first game")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .onAppear {
+                        let elapsed = Date().timeIntervalSince(renderStart) * 1000
+                        print("⏱️ GameProgressionView.body COMPLETE: \(elapsed)ms")
+                    }
             }
         }
-        .frame(maxHeight: 150)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
     }
 }
 }

@@ -87,6 +87,7 @@ final class Point {
     var loser: Player
     var type: PointType
     var setNumber: Int
+    var gameNumber: Int
     var timestamp: Date
 
     // Relationship back to match
@@ -99,6 +100,7 @@ final class Point {
         loser: Player,
         type: PointType,
         setNumber: Int,
+        gameNumber: Int,
         timestamp: Date = Date()
     ) {
         self.id = id
@@ -107,6 +109,7 @@ final class Point {
         self.loser = loser
         self.type = type
         self.setNumber = setNumber
+        self.gameNumber = gameNumber
         self.timestamp = timestamp
     }
 }

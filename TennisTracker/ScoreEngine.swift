@@ -68,6 +68,61 @@ enum ScoreEngine {
         return state.completedSets.count + 1
     }
 
+    static func currentGameNumber(from points: [Point], p1: UUID, p2: UUID) -> Int {
+        guard !points.isEmpty else { return 1 }
+
+        var gamesCompleted = 0
+        var currentGameScore = (p1: 0, p2: 0)
+        var inTiebreak = false
+        var currentSetGames = (p1: 0, p2: 0)
+
+        for point in points {
+            // Add point to current game
+            if point.winner.id == p1 {
+                currentGameScore.p1 += 1
+            } else {
+                currentGameScore.p2 += 1
+            }
+
+            // Check if game is complete
+            let gameWon: Bool
+            if inTiebreak {
+                gameWon = (currentGameScore.p1 >= 7 && currentGameScore.p1 - currentGameScore.p2 >= 2) ||
+                         (currentGameScore.p2 >= 7 && currentGameScore.p2 - currentGameScore.p1 >= 2)
+            } else {
+                gameWon = (currentGameScore.p1 >= 4 && currentGameScore.p1 - currentGameScore.p2 >= 2) ||
+                         (currentGameScore.p2 >= 4 && currentGameScore.p2 - currentGameScore.p1 >= 2)
+            }
+
+            if gameWon {
+                gamesCompleted += 1
+                currentGameScore = (p1: 0, p2: 0)
+
+                // Update set games for tiebreak detection
+                if inTiebreak {
+                    inTiebreak = false
+                    currentSetGames = (p1: 0, p2: 0) // Set complete
+                } else {
+                    if point.winner.id == p1 {
+                        currentSetGames.p1 += 1
+                    } else {
+                        currentSetGames.p2 += 1
+                    }
+
+                    // Check for tiebreak or set completion
+                    if currentSetGames.p1 == 6 && currentSetGames.p2 == 6 {
+                        inTiebreak = true
+                    } else if (currentSetGames.p1 >= 6 && currentSetGames.p1 - currentSetGames.p2 >= 2) ||
+                              (currentSetGames.p2 >= 6 && currentSetGames.p2 - currentSetGames.p1 >= 2) {
+                        currentSetGames = (p1: 0, p2: 0) // Set complete
+                    }
+                }
+            }
+        }
+
+        return gamesCompleted + 1
+    }
+
     // Helper to detect if we just entered a tiebreak and who should serve first
     static func checkForTiebreakStart(
         oldPoints: [Point],
