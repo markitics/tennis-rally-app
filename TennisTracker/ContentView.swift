@@ -76,6 +76,8 @@ struct ContentView: View {
                         StatsView(matches: matches, selectedMatch: $selectedMatch)
                     case .settings:
                         SettingsView()
+                            .environmentObject(liveActivityManager)
+                            .environmentObject(matchViewModel)
                     }
 
                     Spacer()

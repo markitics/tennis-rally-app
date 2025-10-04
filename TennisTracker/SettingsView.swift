@@ -9,6 +9,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("soundEnabled") private var soundEnabled = true
+    @EnvironmentObject var liveActivityManager: LiveActivityManager
+    @EnvironmentObject var viewModel: MatchViewModel
 
     var body: some View {
         List {
@@ -21,6 +23,21 @@ struct SettingsView: View {
                 Text("Audio Feedback")
             } footer: {
                 Text("Play sounds when recording points. Haptic feedback will continue to work regardless of this setting.")
+            }
+
+            if #available(iOS 16.1, *) {
+                Section {
+                    Button {
+                        restartLiveActivity()
+                    } label: {
+                        Label("Restart Live Activity", systemImage: "iphone.radiowaves.left.and.right")
+                    }
+                    .disabled(viewModel.match == nil)
+                } header: {
+                    Text("Live Activity")
+                } footer: {
+                    Text("If you accidentally dismissed the Live Activity, tap here to bring it back.")
+                }
             }
 
             Section {
@@ -46,6 +63,26 @@ struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+    }
+
+    @available(iOS 16.1, *)
+    private func restartLiveActivity() {
+        guard let match = viewModel.match else { return }
+
+        let state = viewModel.derivedState
+        let serverID = ScoreEngine.currentServerID(
+            visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
+            p1: match.playerOne.id,
+            p2: match.playerTwo.id,
+            firstServerID: match.firstServerID
+        )
+        let serverName = (serverID == match.playerOne.id) ? match.playerOne.name : match.playerTwo.name
+
+        liveActivityManager.startMatchActivity(
+            match: match,
+            serverName: serverName,
+            currentScore: state.currentScoreString
+        )
     }
 }
 

@@ -31,39 +31,49 @@ class LiveActivityManager: ObservableObject {
         // End any existing activity first
         endMatchActivity()
 
-        let attributes = TennisMatchAttributes(
-            matchId: match.id.uuidString,
-            startTime: match.matchDate
-        )
+        // Also end any other active activities that might exist (e.g., if user dismissed but we lost track)
+        Task {
+            for activity in Activity<TennisMatchAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
 
-        let initialState = TennisMatchAttributes.ContentState(
-            playerOneName: match.playerOne.name,
-            playerTwoName: match.playerTwo.name,
-            currentScore: currentScore,
-            serverName: serverName,
-            matchStatus: "In Progress",
-            lastUpdated: Date()
-        )
-
-        do {
-            print("🎾 Requesting Live Activity with attributes: \(attributes)")
-            print("🎾 Initial state: \(initialState)")
-
-            let activity = try Activity.request(
-                attributes: attributes,
-                content: .init(state: initialState, staleDate: nil),
-                pushType: nil
+            // Now start the new activity after cleanup
+            let attributes = TennisMatchAttributes(
+                matchId: match.id.uuidString,
+                startTime: match.matchDate
             )
 
-            currentActivity = activity
-            hasActiveActivity = true
-            print("🎾 Live Activity started for match: \(match.playerOne.name) vs \(match.playerTwo.name)")
-            print("🎾 Activity created with ID: \(activity.id)")
-            print("🎾 Activity initial state: \(activity.activityState)")
+            let initialState = TennisMatchAttributes.ContentState(
+                playerOneName: match.playerOne.name,
+                playerTwoName: match.playerTwo.name,
+                currentScore: currentScore,
+                serverName: serverName,
+                matchStatus: "In Progress",
+                lastUpdated: Date()
+            )
 
-        } catch {
-            print("❌ Failed to start Live Activity: \(error)")
-            print("❌ Error details: \(error.localizedDescription)")
+            do {
+                print("🎾 Requesting Live Activity with attributes: \(attributes)")
+                print("🎾 Initial state: \(initialState)")
+
+                let activity = try Activity.request(
+                    attributes: attributes,
+                    content: .init(state: initialState, staleDate: nil),
+                    pushType: nil
+                )
+
+                await MainActor.run {
+                    self.currentActivity = activity
+                    self.hasActiveActivity = true
+                }
+                print("🎾 Live Activity started for match: \(match.playerOne.name) vs \(match.playerTwo.name)")
+                print("🎾 Activity created with ID: \(activity.id)")
+                print("🎾 Activity initial state: \(activity.activityState)")
+
+            } catch {
+                print("❌ Failed to start Live Activity: \(error)")
+                print("❌ Error details: \(error.localizedDescription)")
+            }
         }
     }
 
