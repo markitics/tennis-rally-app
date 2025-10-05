@@ -21,7 +21,7 @@ struct PlayView: View {
 
     private var currentServerID: UUID {
         ScoreEngine.currentServerID(
-            visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
+            visiblePoints: Array(viewModel.cachedPoints.prefix(viewModel.cursor)),
             p1: match.playerOne.id,
             p2: match.playerTwo.id,
             firstServerID: match.firstServerID,
@@ -32,17 +32,18 @@ struct PlayView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+
+                // Completed sets and games display
+                if !viewModel.derivedState.currentScoreString.isEmpty {
+                    CompletedSetsView(derivedState: viewModel.derivedState)
+                }
+
                 // Combined server indicator and current game score
                 CombinedScoreHeaderView(
                     match: match,
                     derivedState: viewModel.derivedState,
                     currentServerID: currentServerID
                 )
-
-                // Completed sets and games display
-                if !viewModel.derivedState.currentScoreString.isEmpty {
-                    CompletedSetsView(derivedState: viewModel.derivedState)
-                }
 
                 // Point input buttons
                 PointInputView(
@@ -250,8 +251,7 @@ struct TimelineNavigationView: View {
                         .monospacedDigit()
 
                     // Debug indicator - only show bug if cursor is out of sync AND we're not intentionally navigating
-                    if let match = viewModel.match,
-                       viewModel.cursor != match.sortedPoints.count &&
+                    if viewModel.cursor != viewModel.cachedPoints.count &&
                        !viewModel.canForward {
                         Text("🐛")
                             .font(.caption2)
@@ -400,32 +400,28 @@ struct PointInputView: View {
             loser = (player.id == match.playerOne.id) ? match.playerTwo : match.playerOne
         }
 
-        // Fix cursor sync issues from rapid tapping, but preserve rewrite-from-here functionality
-        let expectedCursor = match.sortedPoints.count
+        // Implement rewrite-from-here logic using cache
+        if viewModel.cursor < viewModel.cachedPoints.count {
+            // Remove points from cursor position onwards from both cache and SwiftData
+            let pointsToRemove = viewModel.cachedPoints[viewModel.cursor...]
 
-        // If cursor is ahead of points count, it's a race condition - fix it
-        if viewModel.cursor > expectedCursor {
-            viewModel.cursor = expectedCursor
-        }
+            // Remove from cache
+            viewModel.cachedPoints.removeSubrange(viewModel.cursor...)
 
-        // Implement rewrite-from-here logic (restored!)
-        if viewModel.cursor < match.sortedPoints.count {
-            // Remove points from cursor position onwards - need to work with original array
-            let sortedPoints = match.sortedPoints
-            let pointsToRemove = sortedPoints[viewModel.cursor...]
+            // Remove from SwiftData
             for pointToRemove in pointsToRemove {
                 match.points.removeAll { $0.id == pointToRemove.id }
             }
         }
 
         let setNumber = ScoreEngine.currentSetNumber(
-            from: Array(match.sortedPoints.prefix(viewModel.cursor)),
+            from: Array(viewModel.cachedPoints.prefix(viewModel.cursor)),
             p1: match.playerOne.id,
             p2: match.playerTwo.id
         )
 
         let gameNumber = ScoreEngine.currentGameNumber(
-            from: Array(match.sortedPoints.prefix(viewModel.cursor)),
+            from: Array(viewModel.cachedPoints.prefix(viewModel.cursor)),
             p1: match.playerOne.id,
             p2: match.playerTwo.id
         )
@@ -440,24 +436,19 @@ struct PointInputView: View {
         )
 
         // Store old points for tiebreak detection
-        let oldPoints = match.sortedPoints
+        let oldPoints = viewModel.cachedPoints
 
-        // Add point using proper SwiftData relationship
-        let insertStart = Date()
-        print("💾 [BEFORE INSERT] About to insert point - total points before: \(match.sortedPoints.count)")
+        // Add to cache FIRST (instant!)
+        viewModel.addPointToCache(newPoint)
+        print("💾 [CACHE UPDATE] Point added to cache, cursor now: \(viewModel.cursor)")
 
+        // Insert to SwiftData in background (we don't care about lag)
         modelContext.insert(newPoint)
-
-        let insertElapsed = Date().timeIntervalSince(insertStart) * 1000
-        print("💾 [AFTER INSERT] Insert took \(insertElapsed)ms - total points after: \(match.sortedPoints.count)")
-
-        viewModel.cursor = match.sortedPoints.count
-        print("💾 [CURSOR UPDATE] Cursor set to \(viewModel.cursor)")
 
         // Check if we just started a new tiebreak and update tiebreak first servers
         let updatedTiebreakFirstServers = ScoreEngine.checkForTiebreakStart(
             oldPoints: oldPoints,
-            newPoints: match.sortedPoints,
+            newPoints: viewModel.cachedPoints,
             p1: match.playerOne.id,
             p2: match.playerTwo.id,
             firstServerID: match.firstServerID,
@@ -474,18 +465,18 @@ struct PointInputView: View {
 
         // DEBUG: Log for each button press
         let buttonPressed = "\(player.name)'s \(type.rawValue)"
-        let totalPoints = match.sortedPoints.count
+        let totalPoints = viewModel.cachedPoints.count
         let pointWonBy = winner.name
         let newScore = viewModel.derivedState.currentScoreString
 
         print("Button pressed: \(buttonPressed) | Total points played: \(totalPoints) | This point won by: \(pointWonBy) | New overall score: \(newScore)")
 
         // DEBUG: Log the last few points to see what ScoreEngine is processing
-        let recentPoints = match.sortedPoints.suffix(5)
+        let recentPoints = viewModel.cachedPoints.suffix(5)
         print("Recent points: \(recentPoints.map { "\($0.winner.name):\($0.type.rawValue)" }.joined(separator: ", "))")
 
         // DEBUG: Log ALL points to verify chronological order
-        print("ALL POINTS (\(match.sortedPoints.count)): \(match.sortedPoints.map { "\($0.winner.name):\($0.type.rawValue)" }.joined(separator: ", "))")
+        print("ALL POINTS (\(viewModel.cachedPoints.count)): \(viewModel.cachedPoints.map { "\($0.winner.name):\($0.type.rawValue)" }.joined(separator: ", "))")
 
         // Check for game completion (when in-game score resets to 0-0)
         print("🎾 SCORE ANALYSIS: Old: '\(oldScore)' -> New: '\(newScore)'")
@@ -519,7 +510,7 @@ struct PointInputView: View {
         if #available(iOS 16.1, *) {
             let derivedState = viewModel.derivedState
             let serverID = ScoreEngine.currentServerID(
-                visiblePoints: Array(match.sortedPoints.prefix(viewModel.cursor)),
+                visiblePoints: Array(viewModel.cachedPoints.prefix(viewModel.cursor)),
                 p1: match.playerOne.id,
                 p2: match.playerTwo.id,
                 firstServerID: match.firstServerID,
@@ -533,7 +524,7 @@ struct PointInputView: View {
             print("  Server ID: \(serverID)")
             print("  Server name: \(serverName)")
             print("  Cursor: \(viewModel.cursor)")
-            print("  Total points: \(match.sortedPoints.count)")
+            print("  Total points: \(viewModel.cachedPoints.count)")
 
             liveActivityManager.updateMatchActivity(
                 derivedState: derivedState,
@@ -802,7 +793,7 @@ struct GameProgressionView: View {
 
     // Use visible points based on cursor, not all match points
     private var visiblePoints: [Point] {
-        Array(match.sortedPoints.prefix(viewModel.cursor))
+        Array(viewModel.cachedPoints.prefix(viewModel.cursor))
     }
 
     private func pointsToTennisScore(_ p1Points: Int, _ p2Points: Int) -> (String, String) {

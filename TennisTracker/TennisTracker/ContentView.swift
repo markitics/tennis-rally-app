@@ -47,9 +47,26 @@ struct ContentView: View {
     @State private var lastPointTime: Date = .distantPast
     @State private var isProcessingPoint = false
 
-    // Track processed action IDs to detect duplicates
-    private static var processedActionIDs: [String: Date] = [:]
-    private static let actionIDCleanupInterval: TimeInterval = 5.0  // Clean up old IDs after 5 seconds
+    // Track processed action IDs to detect duplicates (thread-safe with actor)
+    private static let actionIDStore = ActionIDStore()
+
+    actor ActionIDStore {
+        private var processedIDs: [String: Date] = [:]
+        private let cleanupInterval: TimeInterval = 5.0
+
+        func hasProcessed(actionID: String) -> Bool {
+            // Clean up old IDs
+            let cutoffTime = Date().addingTimeInterval(-cleanupInterval)
+            processedIDs = processedIDs.filter { $0.value > cutoffTime }
+
+            // Check if already processed
+            return processedIDs[actionID] != nil
+        }
+
+        func markAsProcessed(actionID: String) {
+            processedIDs[actionID] = Date()
+        }
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -137,26 +154,27 @@ struct ContentView: View {
         print("📥 WIDGET ACTION RECEIVED - ID: \(actionID)")
         print("📥   Point type: \(pointTypeString), Player: \(playerName)")
         print("📥   Time since intent: \(String(format: "%.3f", timeSinceIntent * 1000))ms")
-        print("📥   Current point count: \(match.sortedPoints.count)")
 
-        // Check for duplicate action ID
-        let currentTime = Date()
-        if let previousTime = ContentView.processedActionIDs[actionID] {
-            let timeSincePrevious = currentTime.timeIntervalSince(previousTime)
-            print("⚠️ DUPLICATE ACTION ID DETECTED!")
-            print("⚠️   Action ID: \(actionID)")
-            print("⚠️   Time since first occurrence: \(String(format: "%.3f", timeSincePrevious * 1000))ms")
-            print("⚠️   REJECTING duplicate action")
-            return
+        // Check for duplicate action ID using thread-safe actor
+        Task {
+            let alreadyProcessed = await ContentView.actionIDStore.hasProcessed(actionID: actionID)
+            if alreadyProcessed {
+                print("⚠️ DUPLICATE ACTION ID DETECTED!")
+                print("⚠️   Action ID: \(actionID)")
+                print("⚠️   REJECTING duplicate action")
+                return
+            }
+
+            // Mark as processed
+            await ContentView.actionIDStore.markAsProcessed(actionID: actionID)
+
+            await processWidgetAction(pointTypeString: pointTypeString, playerName: playerName, actionID: actionID, match: match)
         }
+    }
 
-        // Record this action ID
-        ContentView.processedActionIDs[actionID] = currentTime
-
-        // Clean up old action IDs (older than 5 seconds)
-        let cutoffTime = currentTime.addingTimeInterval(-ContentView.actionIDCleanupInterval)
-        ContentView.processedActionIDs = ContentView.processedActionIDs.filter { $0.value > cutoffTime }
-        print("📥   Tracked action IDs: \(ContentView.processedActionIDs.count)")
+    @MainActor
+    private func processWidgetAction(pointTypeString: String, playerName: String, actionID: String, match: Match) {
+        print("📥   Processing action on main actor...")
 
         // Convert string to PointType
         let pointType: PointType
@@ -178,7 +196,7 @@ struct ContentView: View {
         let player: Player
         if playerName == "server" {
             let serverID = ScoreEngine.currentServerID(
-                visiblePoints: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+                visiblePoints: Array(matchViewModel.cachedPoints.prefix(matchViewModel.cursor)),
                 p1: match.playerOne.id,
                 p2: match.playerTwo.id,
                 firstServerID: match.firstServerID,
@@ -241,12 +259,12 @@ struct ContentView: View {
 
         // Get current set and game numbers
         let setNumber = ScoreEngine.currentSetNumber(
-            from: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+            from: Array(matchViewModel.cachedPoints.prefix(matchViewModel.cursor)),
             p1: match.playerOne.id,
             p2: match.playerTwo.id
         )
         let gameNumber = ScoreEngine.currentGameNumber(
-            from: Array(match.sortedPoints.prefix(matchViewModel.cursor)),
+            from: Array(matchViewModel.cachedPoints.prefix(matchViewModel.cursor)),
             p1: match.playerOne.id,
             p2: match.playerTwo.id
         )
@@ -261,34 +279,19 @@ struct ContentView: View {
             gameNumber: gameNumber
         )
 
+        // Add to cache FIRST (instant update!)
+        matchViewModel.addPointToCache(newPoint)
+        print("🎯   Point added to cache, cursor now: \(matchViewModel.cursor)")
+
+        // Insert to SwiftData in background (we don't care about lag)
         modelContext.insert(newPoint)
 
-        // CRITICAL: Increment cursor from known position, don't query SwiftData
-        // SwiftData hasn't committed yet, so match.sortedPoints.count is stale
-        matchViewModel.cursor = matchViewModel.cursor + 1
-        print("🎯   Cursor advanced to: \(matchViewModel.cursor)")
-
-        // Update Live Activity
+        // Update Live Activity with fresh cached data
         if #available(iOS 16.1, *) {
-            // CRITICAL: Include uncommitted point in derived state calculation
-            // SwiftData hasn't committed newPoint yet, so we must manually include it
-            let committedPoints = Array(match.sortedPoints)
-            let visiblePointsWithNew = committedPoints + [newPoint]
-
-            print("🎯   Computing Live Activity state:")
-            print("🎯     Committed points: \(committedPoints.count)")
-            print("🎯     With new point: \(visiblePointsWithNew.count)")
-
-            let derivedState = ScoreEngine.compute(
-                visiblePoints: visiblePointsWithNew,
-                fullPoints: visiblePointsWithNew,
-                p1: match.playerOne.id,
-                p2: match.playerTwo.id,
-                firstServerID: match.firstServerID
-            )
+            let derivedState = matchViewModel.derivedState  // Uses cachedPoints!
 
             let serverID = ScoreEngine.currentServerID(
-                visiblePoints: visiblePointsWithNew,
+                visiblePoints: Array(matchViewModel.cachedPoints.prefix(matchViewModel.cursor)),
                 p1: match.playerOne.id,
                 p2: match.playerTwo.id,
                 firstServerID: match.firstServerID,

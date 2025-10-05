@@ -13,6 +13,9 @@ final class MatchViewModel: ObservableObject {
     @Published private(set) var match: Match?
     @Published var cursor: Int = 0
 
+    // In-memory cache to avoid SwiftData lag
+    @Published var cachedPoints: [Point] = []
+
     var derivedState: DerivedMatchState {
         guard let match = match else {
             return DerivedMatchState(
@@ -28,8 +31,8 @@ final class MatchViewModel: ObservableObject {
         }
 
         return ScoreEngine.compute(
-            visiblePoints: Array(match.sortedPoints.prefix(cursor)),
-            fullPoints: match.sortedPoints,
+            visiblePoints: Array(cachedPoints.prefix(cursor)),
+            fullPoints: cachedPoints,
             p1: match.playerOne.id,
             p2: match.playerTwo.id,
             firstServerID: match.firstServerID
@@ -41,13 +44,18 @@ final class MatchViewModel: ObservableObject {
     }
 
     var canForward: Bool {
-        guard let match = match else { return false }
-        return cursor < match.sortedPoints.count
+        return cursor < cachedPoints.count
     }
 
     func setMatch(_ newMatch: Match) {
         match = newMatch
-        cursor = newMatch.sortedPoints.count
+        cachedPoints = newMatch.sortedPoints
+        cursor = cachedPoints.count
+    }
+
+    func addPointToCache(_ point: Point) {
+        cachedPoints.append(point)
+        cursor = cachedPoints.count
     }
 
     func back() {

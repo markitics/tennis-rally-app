@@ -15,6 +15,10 @@
 	<array>
 		<string>WinnerIntent</string>
 		<string>UnforcedErrorIntent</string>
+		<string>AceIntent</string>
+		<string>DoubleFaultIntent</string>
+		<string>JeffWinnerIntent</string>
+		<string>JeffErrorIntent</string>
 	</array>
 	<key>INIntentsRestrictedWhileLocked</key>
 	<array/>
