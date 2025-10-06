@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 import CoreLocation
+import WatchConnectivity
 
 struct ContentView: View {
     enum Tab: String, CaseIterable, Identifiable {
@@ -128,6 +129,49 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RecordPointFromWidget"))) { notification in
             handleWidgetPointAction(notification)
+        }
+        .onAppear {
+            // Set up watch connectivity handler
+            PhoneWatchConnectivity.shared.onWatchAction = { [self] action in
+                guard let match = activeMatch else {
+                    return nil
+                }
+
+                // Handle watch button press
+                let player: Player
+                let type = PointType.winner
+
+                if action == "mark_winner" {
+                    player = match.playerOne
+                } else if action == "jeff_winner" {
+                    player = match.playerTwo
+                } else {
+                    return nil
+                }
+
+                // Record the point (reuse existing logic!)
+                recordPoint(match: match, player: player, type: type)
+
+                // Return current score to watch
+                let derivedState = matchViewModel.derivedState
+
+                // Also send server name
+                let serverID = ScoreEngine.currentServerID(
+                    visiblePoints: Array(matchViewModel.cachedPoints.prefix(matchViewModel.cursor)),
+                    p1: match.playerOne.id,
+                    p2: match.playerTwo.id,
+                    firstServerID: match.firstServerID,
+                    tiebreakFirstServers: match.tiebreakFirstServers
+                )
+                let serverName = serverID == match.playerOne.id ? match.playerOne.name : match.playerTwo.name
+
+                // Send server update via message (no reply needed)
+                Task {
+                    try? WCSession.default.updateApplicationContext(["server": serverName])
+                }
+
+                return derivedState.currentScoreString
+            }
         }
     }
 

@@ -17,8 +17,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4D536E312E89550E0064D515"
-               BuildableName = "TennisTrackerWidgetExtension.appex"
-               BlueprintName = "TennisTrackerWidgetExtension"
+               BuildableName = "Tennis WidgetExtension for LIve Activities.appex"
+               BlueprintName = "Tennis WidgetExtension for LIve Activities"
                ReferencedContainer = "container:TennisTracker.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,8 +31,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4D536DFD2E88F1250064D515"
-               BuildableName = "TennisTracker.app"
-               BlueprintName = "TennisTracker"
+               BuildableName = "Tennis iOS app.app"
+               BlueprintName = "Tennis iOS app"
                ReferencedContainer = "container:TennisTracker.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4D536DFD2E88F1250064D515"
-            BuildableName = "TennisTracker.app"
-            BlueprintName = "TennisTracker"
+            BuildableName = "Tennis iOS app.app"
+            BlueprintName = "Tennis iOS app"
             ReferencedContainer = "container:TennisTracker.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -98,8 +98,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4D536DFD2E88F1250064D515"
-            BuildableName = "TennisTracker.app"
-            BlueprintName = "TennisTracker"
+            BuildableName = "Tennis iOS app.app"
+            BlueprintName = "Tennis iOS app"
             ReferencedContainer = "container:TennisTracker.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

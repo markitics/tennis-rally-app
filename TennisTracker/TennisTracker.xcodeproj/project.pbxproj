@@ -9,7 +9,8 @@
 /* Begin PBXBuildFile section */
 		4D536E352E89550E0064D515 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D536E342E89550E0064D515 /* WidgetKit.framework */; };
 		4D536E372E89550E0064D515 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D536E362E89550E0064D515 /* SwiftUI.framework */; };
-		4D536E482E8955100064D515 /* TennisTrackerWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D536E322E89550E0064D515 /* TennisTrackerWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4D536E482E8955100064D515 /* Tennis WidgetExtension for LIve Activities.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D536E322E89550E0064D515 /* Tennis WidgetExtension for LIve Activities.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4DF2BF062E936DFF00C25C1E /* Tennis Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 4DF2BEFC2E936DFC00C25C1E /* Tennis Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -20,6 +21,13 @@
 			remoteGlobalIDString = 4D536E312E89550E0064D515;
 			remoteInfo = TennisTrackerWidgetExtension;
 		};
+		4DF2BF042E936DFF00C25C1E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4D536DF62E88F1250064D515 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4DF2BEFB2E936DFC00C25C1E;
+			remoteInfo = "TennisTracker Watch App Watch App";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -29,34 +37,46 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				4D536E482E8955100064D515 /* TennisTrackerWidgetExtension.appex in Embed Foundation Extensions */,
+				4D536E482E8955100064D515 /* Tennis WidgetExtension for LIve Activities.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4DF2BF0A2E936DFF00C25C1E /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				4DF2BF062E936DFF00C25C1E /* Tennis Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		4D536DFE2E88F1250064D515 /* TennisTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TennisTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		4D536E322E89550E0064D515 /* TennisTrackerWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TennisTrackerWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D536DFE2E88F1250064D515 /* Tennis iOS app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Tennis iOS app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D536E322E89550E0064D515 /* Tennis WidgetExtension for LIve Activities.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Tennis WidgetExtension for LIve Activities.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D536E342E89550E0064D515 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		4D536E362E89550E0064D515 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		4DF2BEFC2E936DFC00C25C1E /* Tennis Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Tennis Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		4D536E492E8955100064D515 /* Exceptions for "TennisTrackerWidget" folder in "TennisTrackerWidgetExtension" target */ = {
+		4D536E492E8955100064D515 /* Exceptions for "TennisTrackerWidget" folder in "Tennis WidgetExtension for LIve Activities" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 4D536E312E89550E0064D515 /* TennisTrackerWidgetExtension */;
+			target = 4D536E312E89550E0064D515 /* Tennis WidgetExtension for LIve Activities */;
 		};
-		4D536E512E897E420064D515 /* Exceptions for "TennisTracker" folder in "TennisTracker" target */ = {
+		4D536E512E897E420064D515 /* Exceptions for "TennisTracker" folder in "Tennis iOS app" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 4D536DFD2E88F1250064D515 /* TennisTracker */;
+			target = 4D536DFD2E88F1250064D515 /* Tennis iOS app */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -64,7 +84,7 @@
 		4D536E002E88F1250064D515 /* TennisTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				4D536E512E897E420064D515 /* Exceptions for "TennisTracker" folder in "TennisTracker" target */,
+				4D536E512E897E420064D515 /* Exceptions for "TennisTracker" folder in "Tennis iOS app" target */,
 			);
 			path = TennisTracker;
 			sourceTree = "<group>";
@@ -72,9 +92,14 @@
 		4D536E382E89550E0064D515 /* TennisTrackerWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				4D536E492E8955100064D515 /* Exceptions for "TennisTrackerWidget" folder in "TennisTrackerWidgetExtension" target */,
+				4D536E492E8955100064D515 /* Exceptions for "TennisTrackerWidget" folder in "Tennis WidgetExtension for LIve Activities" target */,
 			);
 			path = TennisTrackerWidget;
+			sourceTree = "<group>";
+		};
+		4DF2BEFD2E936DFC00C25C1E /* TennisTrackerWatchApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TennisTrackerWatchApp;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -96,6 +121,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4DF2BEF92E936DFC00C25C1E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -104,6 +136,7 @@
 			children = (
 				4D536E002E88F1250064D515 /* TennisTracker */,
 				4D536E382E89550E0064D515 /* TennisTrackerWidget */,
+				4DF2BEFD2E936DFC00C25C1E /* TennisTrackerWatchApp */,
 				4D536E332E89550E0064D515 /* Frameworks */,
 				4D536DFF2E88F1250064D515 /* Products */,
 			);
@@ -112,8 +145,9 @@
 		4D536DFF2E88F1250064D515 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4D536DFE2E88F1250064D515 /* TennisTracker.app */,
-				4D536E322E89550E0064D515 /* TennisTrackerWidgetExtension.appex */,
+				4D536DFE2E88F1250064D515 /* Tennis iOS app.app */,
+				4D536E322E89550E0064D515 /* Tennis WidgetExtension for LIve Activities.appex */,
+				4DF2BEFC2E936DFC00C25C1E /* Tennis Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -130,33 +164,35 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		4D536DFD2E88F1250064D515 /* TennisTracker */ = {
+		4D536DFD2E88F1250064D515 /* Tennis iOS app */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4D536E0B2E88F1260064D515 /* Build configuration list for PBXNativeTarget "TennisTracker" */;
+			buildConfigurationList = 4D536E0B2E88F1260064D515 /* Build configuration list for PBXNativeTarget "Tennis iOS app" */;
 			buildPhases = (
 				4D536DFA2E88F1250064D515 /* Sources */,
 				4D536DFB2E88F1250064D515 /* Frameworks */,
 				4D536DFC2E88F1250064D515 /* Resources */,
 				4D536E4D2E8955100064D515 /* Embed Foundation Extensions */,
+				4DF2BF0A2E936DFF00C25C1E /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				4D536E472E8955100064D515 /* PBXTargetDependency */,
+				4DF2BF052E936DFF00C25C1E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4D536E002E88F1250064D515 /* TennisTracker */,
 			);
-			name = TennisTracker;
+			name = "Tennis iOS app";
 			packageProductDependencies = (
 			);
 			productName = TennisTracker;
-			productReference = 4D536DFE2E88F1250064D515 /* TennisTracker.app */;
+			productReference = 4D536DFE2E88F1250064D515 /* Tennis iOS app.app */;
 			productType = "com.apple.product-type.application";
 		};
-		4D536E312E89550E0064D515 /* TennisTrackerWidgetExtension */ = {
+		4D536E312E89550E0064D515 /* Tennis WidgetExtension for LIve Activities */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4D536E4A2E8955100064D515 /* Build configuration list for PBXNativeTarget "TennisTrackerWidgetExtension" */;
+			buildConfigurationList = 4D536E4A2E8955100064D515 /* Build configuration list for PBXNativeTarget "Tennis WidgetExtension for LIve Activities" */;
 			buildPhases = (
 				4D536E2E2E89550E0064D515 /* Sources */,
 				4D536E2F2E89550E0064D515 /* Frameworks */,
@@ -169,12 +205,34 @@
 			fileSystemSynchronizedGroups = (
 				4D536E382E89550E0064D515 /* TennisTrackerWidget */,
 			);
-			name = TennisTrackerWidgetExtension;
+			name = "Tennis WidgetExtension for LIve Activities";
 			packageProductDependencies = (
 			);
 			productName = TennisTrackerWidgetExtension;
-			productReference = 4D536E322E89550E0064D515 /* TennisTrackerWidgetExtension.appex */;
+			productReference = 4D536E322E89550E0064D515 /* Tennis WidgetExtension for LIve Activities.appex */;
 			productType = "com.apple.product-type.app-extension";
+		};
+		4DF2BEFB2E936DFC00C25C1E /* Tennis Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4DF2BF072E936DFF00C25C1E /* Build configuration list for PBXNativeTarget "Tennis Watch App" */;
+			buildPhases = (
+				4DF2BEF82E936DFC00C25C1E /* Sources */,
+				4DF2BEF92E936DFC00C25C1E /* Frameworks */,
+				4DF2BEFA2E936DFC00C25C1E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4DF2BEFD2E936DFC00C25C1E /* TennisTrackerWatchApp */,
+			);
+			name = "Tennis Watch App";
+			packageProductDependencies = (
+			);
+			productName = "TennisTracker Watch App Watch App";
+			productReference = 4DF2BEFC2E936DFC00C25C1E /* Tennis Watch App.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -190,6 +248,9 @@
 						CreatedOnToolsVersion = 26.0.1;
 					};
 					4D536E312E89550E0064D515 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					4DF2BEFB2E936DFC00C25C1E = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
@@ -208,8 +269,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				4D536DFD2E88F1250064D515 /* TennisTracker */,
-				4D536E312E89550E0064D515 /* TennisTrackerWidgetExtension */,
+				4D536DFD2E88F1250064D515 /* Tennis iOS app */,
+				4D536E312E89550E0064D515 /* Tennis WidgetExtension for LIve Activities */,
+				4DF2BEFB2E936DFC00C25C1E /* Tennis Watch App */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +285,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4D536E302E89550E0064D515 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4DF2BEFA2E936DFC00C25C1E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -246,13 +315,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4DF2BEF82E936DFC00C25C1E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		4D536E472E8955100064D515 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 4D536E312E89550E0064D515 /* TennisTrackerWidgetExtension */;
+			target = 4D536E312E89550E0064D515 /* Tennis WidgetExtension for LIve Activities */;
 			targetProxy = 4D536E462E8955100064D515 /* PBXContainerItemProxy */;
+		};
+		4DF2BF052E936DFF00C25C1E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4DF2BEFB2E936DFC00C25C1E /* Tennis Watch App */;
+			targetProxy = 4DF2BF042E936DFF00C25C1E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -514,6 +595,74 @@
 			};
 			name = Release;
 		};
+		4DF2BF082E936DFF00C25C1E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 37D452LT85;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "TennisTracker Watch App";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.markmoriarty.apps.TennisTracker;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markmoriarty.apps.TennisTracker.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.6;
+			};
+			name = Debug;
+		};
+		4DF2BF092E936DFF00C25C1E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 37D452LT85;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "TennisTracker Watch App";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.markmoriarty.apps.TennisTracker;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.markmoriarty.apps.TennisTracker.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 11.6;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -526,7 +675,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		4D536E0B2E88F1260064D515 /* Build configuration list for PBXNativeTarget "TennisTracker" */ = {
+		4D536E0B2E88F1260064D515 /* Build configuration list for PBXNativeTarget "Tennis iOS app" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4D536E0C2E88F1260064D515 /* Debug */,
@@ -535,11 +684,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		4D536E4A2E8955100064D515 /* Build configuration list for PBXNativeTarget "TennisTrackerWidgetExtension" */ = {
+		4D536E4A2E8955100064D515 /* Build configuration list for PBXNativeTarget "Tennis WidgetExtension for LIve Activities" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4D536E4B2E8955100064D515 /* Debug */,
 				4D536E4C2E8955100064D515 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4DF2BF072E936DFF00C25C1E /* Build configuration list for PBXNativeTarget "Tennis Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4DF2BF082E936DFF00C25C1E /* Debug */,
+				4DF2BF092E936DFF00C25C1E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

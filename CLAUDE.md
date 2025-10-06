@@ -242,6 +242,63 @@ ObservableObject with:
 
 **Result**: Live Activity now works perfectly with instant score updates from lock screen! 🎾
 
+### 🎯 Current Focus: Apple Watch App
+
+**Goal**: Allow players to record points from their Apple Watch without pulling out their phone during active play.
+
+**Why This Matters:**
+- Better UX during matches - no need to interrupt play to pull phone from pocket
+- Apple Watch Ultra's large buttons are perfect for quick point recording
+- Haptic feedback on wrist provides immediate confirmation
+- Complications allow instant access to match tracking
+
+**Architecture Decisions to Make:**
+
+1. **App Type:**
+   - **Independent watchOS app** (runs standalone, syncs to phone in background)
+   - **Companion app** (requires phone nearby, direct communication)
+   - **Recommendation**: Companion app initially (simpler sync, leverages existing iPhone app state)
+
+2. **Sync Strategy:**
+   - **Watch Connectivity framework** for real-time phone-watch communication
+   - **Shared App Group** (already configured: `group.com.markmoriarty.apps.TennisTracker`)
+   - **Point recording flow**: Watch → WCSession → Phone (records point) → Update watch UI
+   - **Match state flow**: Phone → WCSession → Watch (cursor updates, score changes)
+
+3. **watchOS UI Design:**
+   - **6 large buttons** matching iPhone app (Ace, Winner, Error, Double Fault for each player)
+   - **Digital Crown navigation** for timeline back/forward (natural watch interaction)
+   - **Compact score display** optimized for small screen
+   - **Haptic patterns** differentiated by player (like iPhone app)
+   - **Always-on display** support for quick glances during play
+
+4. **Complications:**
+   - **Graphic Circular**: Show current score
+   - **Graphic Rectangular**: Score + set count
+   - **Quick launch** from any watch face
+
+5. **Technical Implementation:**
+   - **WatchConnectivity** session management in both apps
+   - **Message passing** for point recording (similar to Live Activity AppIntents)
+   - **Application context** for match state sync
+   - **Background tasks** for keeping watch data current
+
+**Estimated Effort**: 6-10 hours
+- watchOS target setup: 1 hour
+- UI design & layout: 2-3 hours
+- Watch Connectivity integration: 2-3 hours
+- Testing & debugging sync: 2-3 hours
+- Complications: 1 hour
+
+**Next Steps** (once approved):
+1. Add watchOS target to Xcode project
+2. Set up Watch Connectivity in both apps
+3. Design watch UI with 6-button layout
+4. Implement point recording message passing
+5. Add timeline navigation via Digital Crown
+6. Create watch complications
+7. Test sync reliability during active match
+
 ### 🔴 High Priority Next Steps (Blocking Correctness)
 
 1. **Fix duplicate game number logic** (ScoreEngine.swift:83-136)
@@ -297,23 +354,18 @@ ObservableObject with:
 
 ### 🟢 Low Priority (Nice-to-Have)
 
-8. **Apple Watch app for wrist-based point recording**
-   - **Why**: Allow players to record points from their Apple Watch without pulling out phone
-   - **Impact**: Better UX during active play, especially with Apple Watch Ultra's large buttons
-   - **Estimated effort**: TBD (requires watchOS development, phone-watch sync)
-
-9. **Add unit tests for ScoreEngine**
+8. **Add unit tests for ScoreEngine**
    - **Why**: Pure functions, complex tennis rules (deuce, tiebreaks, server rotation)
    - **Impact**: Confidence in scoring logic, catch regressions
    - **Estimated effort**: 4-6 hours
 
-10. **Replace print debugging with OSLog**
+9. **Replace print debugging with OSLog**
    - **Problem**: 50+ print statements for debugging
    - **Fix**: Use OSLog with log levels (debug, info, error)
    - **Impact**: Production-ready logging, better performance
    - **Estimated effort**: 2 hours
 
-11. **Clean up commented code**
+10. **Clean up commented code**
     - **Problem**: Dead code in StatsView:627-640
     - **Fix**: Delete commented sections, use git for history
     - **Impact**: Cleaner codebase
