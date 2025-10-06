@@ -372,9 +372,9 @@ struct PointInputView: View {
             speechSynthesizer.speak(utterance)
         }
 
-        // Debounce rapid button presses to prevent crashes
+        // Debounce rapid button presses to prevent accidental double-taps
         let now = Date()
-        guard now.timeIntervalSince(lastPointTime) > 0.1 else { return } // 100ms minimum between points
+        guard now.timeIntervalSince(lastPointTime) > 0.05 else { return } // 50ms minimum between points
         lastPointTime = now
 
         // Prevent multiple point processing

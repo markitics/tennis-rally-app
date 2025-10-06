@@ -63,12 +63,12 @@ ObservableObject with:
 - **View tab**: StatsView with charts/analytics
 - **Settings tab**: Sound toggle, placeholder for future settings
 - Handles Live Activity button actions via NotificationCenter
-- **⚠️ Complex debouncing logic** for rapid button presses (500ms debounce, action ID deduplication)
+- 50ms debounce to prevent accidental double-taps while allowing rapid catch-up entry
 
 **PlayView**: 6-button input interface
 - **UnifiedButtonsView**: Context-aware buttons (serve/rally/errors) arranged in 2x3 grid
 - Shows current score, completed sets, timeline navigation
-- **⚠️ Duplicate debouncing** (100ms here, 500ms in ContentView)
+- 50ms debounce (same as ContentView for consistency)
 - **GameProgressionView**: Shows point-by-point progression like "0-0 → Mark winner → 15-0"
 - Haptic feedback (different patterns for Mark vs Jeff)
 - Speech synthesis for point announcements
@@ -94,11 +94,10 @@ ObservableObject with:
    - **Evidence**: StatsView has workaround code to recalculate game numbers
    - **Fix**: Delete `currentGameNumber()`, extract from `foldPoints()` result instead
 
-2. **Duplicate Debouncing** (PlayView + ContentView)
-   - PlayView: 100ms debounce (lines 377-378)
-   - ContentView: 500ms debounce (lines 212-216)
-   - **Issue**: Inconsistent timing, double processing guards
-   - **Fix**: Consolidate into single source (ContentView is better since it handles both UI and Live Activity)
+2. **Debouncing** (PlayView + ContentView) - ✅ FIXED 2025-10-05
+   - Both now use consistent 50ms debounce
+   - Prevents accidental double-taps while allowing rapid catch-up entry
+   - Previous: 500ms (ContentView), 100ms (PlayView) - too slow for catching up on missed points
 
 3. **SwiftData Race Condition Workarounds** (ContentView:266-305)
    - Manually includes uncommitted points in calculations
@@ -177,8 +176,9 @@ ObservableObject with:
     - **Recommendation**: Start with ScoreEngine tests (tennis scoring rules are complex)
 
 17. **Magic Numbers**
-    - Debounce times (0.1, 0.5), chart heights (18, 200), widths (30, 80)
+    - Chart heights (18, 200), widths (30, 80)
     - **Fix**: Extract to named constants
+    - Note: Debounce time (0.05/50ms) is now consistent across the app
 
 18. **Print Debugging Everywhere**
     - 50+ print statements for debugging
@@ -606,6 +606,10 @@ Button(intent: WinnerIntent()) {
 - Without opening app ✅
 
 **Lesson:** For Live Activities that should work from lock screen, ALWAYS use `Button(intent:)` not `Link(destination:)`. URL schemes are for deep linking, not background actions.
+
+## When writing commit messages
+This whole app is being vibe-coded by Claude, which we'll celebrate in the README.md.
+Therefore, do not include extraneous mentions like this in commit messages: "written by claude code" or similar; never write "Co-Authored-By: Claude <noreply@anthropic.com>" (or similar) in a commit message
 
 ## BugFixes
 

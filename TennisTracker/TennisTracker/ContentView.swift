@@ -226,10 +226,10 @@ struct ContentView: View {
         print("🎯   Current cursor: \(matchViewModel.cursor)")
         print("🎯   isProcessingPoint: \(isProcessingPoint)")
 
-        // Debounce rapid button presses (500ms = 0.5 seconds)
-        guard timeSinceLastPoint > 0.5 else {
+        // Debounce rapid button presses (50ms)
+        guard timeSinceLastPoint > 0.05 else {
             print("⏭️ DEBOUNCE REJECTION - Too fast!")
-            print("⏭️   Elapsed: \(String(format: "%.3f", timeSinceLastPoint * 1000))ms (need 500ms)")
+            print("⏭️   Elapsed: \(String(format: "%.3f", timeSinceLastPoint * 1000))ms (need 50ms)")
             return
         }
         lastPointTime = entryTime
