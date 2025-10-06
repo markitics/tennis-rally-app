@@ -17,6 +17,7 @@ struct StatsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var filterMode: FilterMode = .allSets
     @State private var showingDeleteAlert = false
+    @State private var showingEndMatchAlert = false
     @State private var showingNoteEditor = false
 
     var body: some View {
@@ -68,7 +69,7 @@ struct StatsView: View {
                         // Action buttons (shown for all filter modes)
                         MatchActionButtonsView(
                             match: match,
-                            onEndMatch: { endMatch(match) },
+                            onEndMatch: { showingEndMatchAlert = true },
                             onDeleteMatch: { showingDeleteAlert = true },
                             onAddNote: { showingNoteEditor = true }
                         )
@@ -96,6 +97,16 @@ struct StatsView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to delete this match? This action cannot be undone.")
+        }
+        .alert("End Match", isPresented: $showingEndMatchAlert) {
+            Button("End Match", role: .destructive) {
+                if let match = selectedMatch {
+                    endMatch(match)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Once you mark this match as complete, you cannot add more points or edit the score.")
         }
         .sheet(isPresented: $showingNoteEditor) {
             if let match = selectedMatch {
@@ -138,19 +149,29 @@ struct MatchSelectorView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Match")
-                .font(.headline)
-
-            Picker("Select Match", selection: $selectedMatch) {
-                ForEach(sortedMatches) { match in
-                    Text(formatMatchLabel(match))
-                        .padding(.vertical, 2)
-                        .tag(Optional(match))
+        NavigationLink {
+            MatchListSelectionView(matches: sortedMatches, selectedMatch: $selectedMatch)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Match")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if let match = selectedMatch {
+                        Text(formatMatchLabel(match))
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                    }
                 }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
-            .pickerStyle(.menu)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private func formatMatchLabel(_ match: Match) -> String {
@@ -160,6 +181,117 @@ struct MatchSelectorView: View {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "E d MMM yyyy 'at' HH:mm"
         return dateFormatter.string(from: match.matchDate)
+    }
+}
+
+struct MatchListSelectionView: View {
+    let matches: [Match]
+    @Binding var selectedMatch: Match?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            ForEach(matches) { match in
+                Button {
+                    selectedMatch = match
+                    dismiss()
+                } label: {
+                    MatchRowView(match: match, isSelected: selectedMatch?.id == match.id)
+                }
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+            }
+        }
+        .navigationTitle("Select Match")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct MatchRowView: View {
+    let match: Match
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                // Match title or date
+                if let title = match.title, !title.isEmpty {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                } else {
+                    Text(formatDate(match.matchDate))
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
+
+                // Players
+                Text("\(match.playerOne.name) vs \(match.playerTwo.name)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                // Score and metadata row
+                HStack(spacing: 8) {
+                    // Final score
+                    if let derivedState = computeMatchState(for: match) {
+                        Text(formatScore(derivedState))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // Weather if available
+                    if let weatherSymbol = match.weatherSymbol {
+                        HStack(spacing: 2) {
+                            Image(systemName: weatherSymbol)
+                            if let temp = match.temperature {
+                                Text("\(Int(temp))°")
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Checkmark for selected match
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(.tint)
+                    .font(.body.weight(.semibold))
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "E d MMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    private func computeMatchState(for match: Match) -> DerivedMatchState? {
+        let points = match.sortedPoints
+        guard !points.isEmpty else { return nil }
+
+        return ScoreEngine.compute(
+            visiblePoints: points,
+            fullPoints: points,
+            p1: match.playerOne.id,
+            p2: match.playerTwo.id,
+            firstServerID: match.firstServerID
+        )
+    }
+
+    private func formatScore(_ state: DerivedMatchState) -> String {
+        // Use setScores which is [(p1Games: Int, p2Games: Int)]
+        let scoreComponents = state.setScores.map { "\($0.p1Games)-\($0.p2Games)" }
+
+        if scoreComponents.isEmpty {
+            return "No sets completed"
+        }
+
+        return scoreComponents.joined(separator: ", ")
     }
 }
 

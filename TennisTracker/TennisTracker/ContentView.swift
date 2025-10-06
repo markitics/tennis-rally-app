@@ -340,9 +340,6 @@ struct ContentView: View {
     private func createNewMatch(firstServer: Player) {
         print("🎾 DEBUG: createNewMatch called with server: \(firstServer.name)")
 
-        // Request fresh location for this match
-        locationManager.requestLocation()
-
         let player1: Player
         let player2: Player
 
@@ -361,40 +358,60 @@ struct ContentView: View {
         // Map the selected firstServer to the actual player we're using
         let actualFirstServerID = firstServer.name == player1.name ? player1.id : player2.id
 
+        // Request fresh, accurate location for this match
+        print("📍 Requesting fresh location for new match...")
+        locationManager.requestLocation()
+
+        // Create match with location (will be nil initially if location not ready)
         let newMatch = Match(
             playerOne: player1,
             playerTwo: player2,
             firstServerID: actualFirstServerID,
-            latitude: locationManager.currentLocation?.coordinate.latitude,
-            longitude: locationManager.currentLocation?.coordinate.longitude
+            latitude: nil,  // Will be updated when location arrives
+            longitude: nil
         )
-
-        print("📍 Match created with location: lat=\(newMatch.latitude?.description ?? "nil"), lon=\(newMatch.longitude?.description ?? "nil")")
 
         modelContext.insert(newMatch)
         selectedMatch = newMatch  // Auto-select the new match in View tab
         showingFirstServerSelection = false
 
-        // Fetch weather asynchronously in the background (non-blocking)
-        // Wait a moment for location to arrive if needed
+        // Wait for accurate location and update match + fetch weather
         Task {
-            // Give location manager up to 2 seconds to get a fix
+            print("⏳ Waiting for accurate location (up to 12 seconds)...")
             var attempts = 0
-            while (newMatch.latitude == nil || newMatch.longitude == nil) && attempts < 20 {
+            var bestLocation: CLLocation?
+
+            // Wait up to 12 seconds for location (LocationManager waits up to 10s for accuracy)
+            while attempts < 120 {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+
                 if let currentLoc = locationManager.currentLocation {
-                    newMatch.latitude = currentLoc.coordinate.latitude
-                    newMatch.longitude = currentLoc.coordinate.longitude
-                    print("📍 Location updated: \(currentLoc.coordinate.latitude), \(currentLoc.coordinate.longitude)")
+                    // Check if this is a new location (timestamp within last 15 seconds)
+                    let age = abs(currentLoc.timestamp.timeIntervalSinceNow)
+                    if age < 15.0 {
+                        bestLocation = currentLoc
+                        print("✅ Got fresh location: \(currentLoc.horizontalAccuracy)m accuracy, \(String(format: "%.1f", age))s old")
+                        break
+                    }
                 }
                 attempts += 1
             }
 
-            if let lat = newMatch.latitude, let lon = newMatch.longitude {
-                print("🌤️ Location available: \(lat), \(lon) - fetching weather...")
-                await WeatherService.shared.fetchWeather(for: newMatch, latitude: lat, longitude: lon)
+            // Update match with best available location
+            if let location = bestLocation {
+                newMatch.latitude = location.coordinate.latitude
+                newMatch.longitude = location.coordinate.longitude
+                print("📍 Match location saved: \(location.coordinate.latitude), \(location.coordinate.longitude) (±\(location.horizontalAccuracy)m)")
+
+                // Fetch weather with the accurate location
+                print("🌤️ Fetching weather for match location...")
+                await WeatherService.shared.fetchWeather(
+                    for: newMatch,
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
             } else {
-                print("⚠️ No location available for weather fetch after \(attempts) attempts")
+                print("⚠️ No location available after \(attempts * 100)ms - match saved without location")
             }
         }
 

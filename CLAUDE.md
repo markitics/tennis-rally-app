@@ -297,18 +297,23 @@ ObservableObject with:
 
 ### 🟢 Low Priority (Nice-to-Have)
 
-8. **Add unit tests for ScoreEngine**
+8. **Apple Watch app for wrist-based point recording**
+   - **Why**: Allow players to record points from their Apple Watch without pulling out phone
+   - **Impact**: Better UX during active play, especially with Apple Watch Ultra's large buttons
+   - **Estimated effort**: TBD (requires watchOS development, phone-watch sync)
+
+9. **Add unit tests for ScoreEngine**
    - **Why**: Pure functions, complex tennis rules (deuce, tiebreaks, server rotation)
    - **Impact**: Confidence in scoring logic, catch regressions
    - **Estimated effort**: 4-6 hours
 
-9. **Replace print debugging with OSLog**
+10. **Replace print debugging with OSLog**
    - **Problem**: 50+ print statements for debugging
    - **Fix**: Use OSLog with log levels (debug, info, error)
    - **Impact**: Production-ready logging, better performance
    - **Estimated effort**: 2 hours
 
-10. **Clean up commented code**
+11. **Clean up commented code**
     - **Problem**: Dead code in StatsView:627-640
     - **Fix**: Delete commented sections, use git for history
     - **Impact**: Cleaner codebase
@@ -607,9 +612,49 @@ Button(intent: WinnerIntent()) {
 
 **Lesson:** For Live Activities that should work from lock screen, ALWAYS use `Button(intent:)` not `Link(destination:)`. URL schemes are for deep linking, not background actions.
 
-## When writing commit messages
-This whole app is being vibe-coded by Claude, which we'll celebrate in the README.md.
-Therefore, do not include extraneous mentions like this in commit messages: "written by claude code" or similar; never write "Co-Authored-By: Claude <noreply@anthropic.com>" (or similar) in a commit message
+## Git Commit Workflow
+
+**CRITICAL: Follow this workflow automatically whenever the user asks to commit/push changes.**
+
+When the user says "commit and push" (or similar):
+
+1. **Draft commit message** based on the changes we made together
+   - Be concise and descriptive
+   - Follow conventional commit style if appropriate
+   - Do NOT add "written by claude code" or "Co-Authored-By: Claude" (this app is vibe-coded by Claude, we'll celebrate that in README.md)
+
+2. **Update SettingsView.swift BEFORE committing:**
+   - **Line 62**: Update "Last Updated" timestamp to current PT time
+     - Format: `Text("Oct 5, 2025 3:47 PM PT")`
+     - Use `TZ="America/Los_Angeles" date` to get PT time
+
+   - **Lines 80-89**: Update "Recent Changes" section with 10 commits total:
+     - First item: The NEW commit message I just drafted (with today's date)
+     - Next 9 items: Run `git log -9 --pretty=format:"%ad: %s" --date=format:"%b %-d" --no-merges`
+     - Format each as: `RecentCommitRow(message: "Oct 5: Message text here")`
+     - If message is long, don't worry - RecentCommitRow truncates at 70 chars automatically
+
+3. **Show the user** the drafted commit message for approval
+
+4. **If approved**, proceed with:
+   ```bash
+   git add .
+   git commit -m "$(cat <<'EOF'
+   Your commit message here.
+   EOF
+   )"
+   git push
+   ```
+
+**Example:**
+```
+User: "Please commit and push these changes"
+Me:
+  1. Analyze changes → Draft message: "Add navigation-based match selector and improve location accuracy"
+  2. Update SettingsView.swift with current timestamp and 10 recent commits
+  3. "I've drafted this commit message: 'Add navigation-based match selector and improve location accuracy'. Should I proceed?"
+  4. [User approves] → git add/commit/push
+```
 
 ## BugFixes
 
